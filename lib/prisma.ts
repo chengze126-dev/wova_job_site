@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "crypto";
+import { AsyncLocalStorage } from "async_hooks";
 import fs from "fs";
 import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
@@ -7,7 +8,12 @@ import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 
 type Dict = Record<string, unknown>;
 
-const globalForDb = globalThis as unknown as { hirelineDb?: DatabaseSync };
+const globalForDb = globalThis as unknown as {
+  hirelineDb?: DatabaseSync;
+  hirelineSeeded?: boolean;
+  hirelineSeedPromise?: Promise<void>;
+};
+const seedContext = new AsyncLocalStorage<boolean>();
 
 function dataDir() {
   // Vercel’s serverless filesystem is read-only except /tmp.
@@ -24,6 +30,23 @@ function db() {
   migrate(instance);
   globalForDb.hirelineDb = instance;
   return instance;
+}
+
+async function ensureDemoSeed() {
+  if (globalForDb.hirelineSeeded || seedContext.getStore()) return;
+  const row = db().prepare("SELECT COUNT(*) AS c FROM User").get() as { c: number } | undefined;
+  if (row && Number(row.c) > 0) {
+    globalForDb.hirelineSeeded = true;
+    return;
+  }
+  if (!globalForDb.hirelineSeedPromise) {
+    globalForDb.hirelineSeedPromise = seedContext.run(true, async () => {
+      const { seedDemoData } = await import("./seed-demo");
+      await seedDemoData();
+      globalForDb.hirelineSeeded = true;
+    });
+  }
+  await globalForDb.hirelineSeedPromise;
 }
 
 function ensureCodingQuestions(instance: DatabaseSync) {
@@ -415,6 +438,7 @@ function userWhereSql(where: Dict = {}) {
 export const prisma = {
   user: {
     async findUnique({ where }: { where: Dict }) {
+      await ensureDemoSeed();
       if (where.id) return getUserById(String(where.id));
       if (where.email) {
         const row = db().prepare("SELECT * FROM User WHERE email = ?").get(where.email) as Dict | undefined;
@@ -423,6 +447,7 @@ export const prisma = {
       return null;
     },
     async findMany({ where = {}, orderBy }: { where?: Dict; orderBy?: Dict } = {}) {
+      await ensureDemoSeed();
       const { clauses, params } = userWhereSql(where);
       const order = orderBy?.createdAt === "desc" ? "createdAt DESC" : orderBy?.name === "asc" ? "name ASC" : "createdAt DESC";
       const extra =
@@ -431,6 +456,7 @@ export const prisma = {
       return (db().prepare(sql).all(...params) as Dict[]).map(mapUser);
     },
     async count({ where = {} }: { where?: Dict } = {}) {
+      await ensureDemoSeed();
       const { clauses, params } = userWhereSql(where);
       const row = db()
         .prepare(`SELECT COUNT(*) as c FROM User ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`)
@@ -541,6 +567,7 @@ export const prisma = {
   },
   job: {
     async findUnique({ where, include }: { where: { id: string }; include?: Dict }) {
+      await ensureDemoSeed();
       const row = db().prepare("SELECT * FROM Job WHERE id = ?").get(where.id) as Dict | undefined;
       if (!row) return null;
       const job = mapJob(row);
@@ -566,6 +593,7 @@ export const prisma = {
       orderBy?: Dict;
       take?: number;
     } = {}) {
+      await ensureDemoSeed();
       const clauses: string[] = [];
       const params: unknown[] = [];
       if (where.status) {
@@ -616,6 +644,7 @@ export const prisma = {
       });
     },
     async count({ where = {} }: { where?: Dict } = {}) {
+      await ensureDemoSeed();
       const clauses: string[] = [];
       const params: unknown[] = [];
       if (where.status) {

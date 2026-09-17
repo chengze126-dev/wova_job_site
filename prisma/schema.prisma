@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String
+  name          String
+  country       String?
+  phone         String?
+  phoneVerified Boolean  @default(false)
+  phoneOtpHash  String?
+  phoneOtpExpires DateTime?
+  bio           String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  linkedinUrl     String?
+  resumeUrl       String?
+  skillTestPassed Boolean @default(false)
+  talentBadge     Boolean @default(false)
+  connects        Int     @default(0)
+  onboardingDone  Boolean @default(false)
+
+  companyName      String?
+  companySize      String?
+  companyIndustry  String?
+  companyWebsite   String?
+  companyLocation  String?
+  stripeCustomerId String?
+  paymentConnected Boolean @default(false)
+
+  jobsPosted     Job[]             @relation("ClientJobs")
+  applications   Application[]
+  skillAttempts  SkillAttempt[]
+  purchases      ConnectPurchase[]
+  sentMessages   Message[]         @relation("SentMessages")
+  conversationsA Conversation[]    @relation("ConversationUserA")
+  conversationsB Conversation[]    @relation("ConversationUserB")
+}
+
+model Job {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  category     String
+  skills       String
+  budgetMin    Int?
+  budgetMax    Int?
+  budgetType   String   @default("fixed")
+  highBadge    Boolean  @default(false)
+  connectCost  Int      @default(10)
+  status       String   @default("OPEN")
+  clientId     String
+  client       User     @relation("ClientJobs", fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  applications Application[]
+}
+
+model Application {
+  id           String   @id @default(cuid())
+  jobId        String
+  talentId     String
+  coverLetter  String
+  connectsUsed Int
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  talent       User     @relation(fields: [talentId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, talentId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userAId   String
+  userBId   String
+  userA     User      @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User      @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now())
+  messages  Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model SkillQuestion {
+  id           String  @id @default(cuid())
+  prompt       String
+  options      String
+  correctIndex Int
+  category     String
+  kind         String  @default("mcq")
+  starterCode  String?
+  functionName String?
+  tests        String?
+}
+
+model SkillAttempt {
+  id            String    @id @default(cuid())
+  talentId      String
+  talent        User      @relation(fields: [talentId], references: [id], onDelete: Cascade)
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  score         Int?
+  passed        Boolean   @default(false)
+  cameraEnabled Boolean   @default(false)
+  answers       String?
+}
+
+model ConnectPurchase {
+  id              String   @id @default(cuid())
+  talentId        String
+  talent          User     @relation(fields: [talentId], references: [id], onDelete: Cascade)
+  connects        Int
+  amountCents     Int
+  stripeSessionId String?  @unique
+  status          String   @default("completed")
+  createdAt       DateTime @default(now())
+}

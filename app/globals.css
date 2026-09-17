@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --paper: #ffffff;
+  --paper-2: #f4f7f5;
+  --ink: #07140f;
+  --muted: #66756f;
+  --line: #e5ece8;
+  --copper: #22c55e;
+  --copper-dark: #16a34a;
+  --pine: #14532d;
+  --gold: #22c55e;
+  --white: #ffffff;
+  --hero: #0b0d0e;
+  --brand: #22c55e;
+  --cream: #ffffff;
+  --header: #ffffff;
+  --header-fg: #07140f;
+  --footer: #f4f7f5;
+  --footer-fg: #07140f;
+  color-scheme: light;
+}
+
+.dark {
+  --paper: #0b0d0e;
+  --paper-2: #151a18;
+  --ink: #f3f6f4;
+  --muted: #9aa8a2;
+  --line: #2a3330;
+  --copper: #22c55e;
+  --copper-dark: #4ade80;
+  --pine: #86efac;
+  --gold: #22c55e;
+  --hero: #050607;
+  --brand: #22c55e;
+  --cream: #171c1a;
+  --header: #05080c;
+  --header-fg: #f3f6f4;
+  --footer: #050607;
+  --footer-fg: #f3f6f4;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-copper: var(--copper);
+  --color-copper-dark: var(--copper-dark);
+  --color-pine: var(--pine);
+  --color-gold: var(--gold);
+  --color-cream: var(--cream);
+  --color-hero: var(--hero);
+  --color-brand: var(--brand);
+  --color-header: var(--header);
+  --color-header-fg: var(--header-fg);
+  --color-footer: var(--footer);
+  --color-footer-fg: var(--footer-fg);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+html:has([data-home]),
+html:has([data-auth]) {
+  scrollbar-width: none;
+}
+
+html:has([data-home])::-webkit-scrollbar,
+html:has([data-auth])::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html:has([data-upwork-profile]),
+html:has([data-upwork-profile]) body {
+  background: var(--paper);
+}
+
+body {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100%;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+::selection {
+  background: #bbf7d0;
+}
+
+.dark ::selection {
+  background: #14532d;
+  color: #f3f6f4;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@layer base {
+  a {
+    color: inherit;
+  }
+}
+
+.workora-cta,
+.workora-cta:hover {
+  color: #ffffff;
+}
+
+@keyframes workora-kenburns {
+  0% { transform: scale(1.06) translate3d(0, 0, 0); }
+  100% { transform: scale(1.18) translate3d(-2.5%, -1.5%, 0); }
+}
+
+@keyframes workora-orb {
+  0%,
+  100% { transform: translate3d(-6%, 8%, 0) scale(1); opacity: 0.55; }
+  50% { transform: translate3d(12%, -10%, 0) scale(1.15); opacity: 0.85; }
+}
+
+.workora-intro-pan {
+  animation: workora-kenburns 16s ease-in-out infinite alternate;
+}
+
+.workora-intro-orb {
+  animation: workora-orb 7s ease-in-out infinite;
+}
+
+.workora-intro-paused .workora-intro-walk,
+.workora-intro-paused .workora-intro-glow {
+  animation-play-state: paused;
+}
+
+@keyframes workora-walk {
+  0% {
+    transform: translate3d(92%, 8%, 0) scale(1.04) rotate(-2.4deg);
+  }
+  8% {
+    transform: translate3d(76%, -7%, 0) scale(1.05) rotate(1.8deg);
+  }
+  16% {
+    transform: translate3d(62%, 7%, 0) scale(1.06) rotate(-1.6deg);
+  }
+  24% {
+    transform: translate3d(48%, -8%, 0) scale(1.07) rotate(1.6deg);
+  }
+  32% {
+    transform: translate3d(36%, 6%, 0) scale(1.08) rotate(-1.3deg);
+  }
+  40% {
+    transform: translate3d(24%, -7%, 0) scale(1.09) rotate(1.2deg);
+  }
+  48% {
+    transform: translate3d(14%, 4%, 0) scale(1.1) rotate(-0.8deg);
+  }
+  56% {
+    transform: translate3d(6%, -3%, 0) scale(1.11) rotate(0.4deg);
+  }
+  64% {
+    transform: translate3d(0, 0, 0) scale(1.12) rotate(0);
+  }
+  100% {
+    transform: translate3d(-3%, -1.5%, 0) scale(1.16) rotate(0);
+  }
+}
+
+.workora-intro-walk {
+  animation: workora-walk 6.8s cubic-bezier(0.42, 0.02, 0.38, 1) infinite;
+}
+
+@keyframes workora-float {
+  0%,
+  100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -7px, 0); }
+}
+
+@keyframes workora-in {
+  0% { opacity: 0; transform: translate3d(18px, 10px, 0) scale(0.94); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes workora-glow {
+  0%,
+  100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+
+@keyframes workora-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+@keyframes workora-ribbon {
+  0% { stroke-dashoffset: 420; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes workora-spark {
+  0%,
+  100% { opacity: 0.15; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.workora-intro-float {
+  animation: workora-float 4.6s ease-in-out infinite;
+}
+
+.workora-intro-in {
+  animation: workora-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.workora-intro-glow {
+  animation: workora-glow 3.4s ease-in-out infinite;
+}
+
+.workora-intro-shimmer {
+  animation: workora-shimmer 3.8s ease-in-out infinite;
+}
+
+.workora-intro-ribbon {
+  stroke-dasharray: 420;
+  animation: workora-ribbon 3.2s ease-in-out infinite alternate;
+}
+
+.workora-intro-spark {
+  animation: workora-spark 2.4s ease-in-out infinite;
+}

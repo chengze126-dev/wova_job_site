@@ -1,0 +1,12 @@
+Maya Chen
+Product designer & front-end engineer
+
+LinkedIn: https://www.linkedin.com/in/maya-chen-example
+
+Experience
+- Led onboarding redesign for a logistics dashboard (cut time-to-value from 18 min to 4 min)
+- Shipped design systems in Figma + React for B2B SaaS
+- Facilitated research with ops managers and implemented the resulting UI
+
+Skills
+UX, React, Figma, Next.js, design critique, stakeholder communication

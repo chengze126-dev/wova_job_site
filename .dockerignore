@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+data/*.db
+data/*.db-journal
+.env
+.env.*
+!.env.example
+*.md
+AGENTS.md
+CLAUDE.md

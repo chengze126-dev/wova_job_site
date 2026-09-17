@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
+import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 
 type Dict = Record<string, unknown>;
 

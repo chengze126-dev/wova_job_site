@@ -264,3 +264,59 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/talents");
   return { ok: true };
 }
+
+function randomOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+export async function sendPhoneOtp() {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." };
+  if (!user.phone || user.phone.replace(/\D/g, "").length < 10) {
+    return { error: "Add a valid phone number to your profile first." };
+  }
+  if (user.phoneVerified) {
+    return { error: "This number is already verified." };
+  }
+
+  const code = randomOtp();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      phoneOtpHash: await hash(code, 10),
+      phoneOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
+
+  return { message: `Demo code: ${code}` };
+}
+
+export async function verifyPhoneOtp(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const code = String(formData.get("code") || "").replace(/\D/g, "");
+  if (code.length !== 6) return { error: "Enter the 6-digit code." };
+  if (!user.phoneOtpHash || !user.phoneOtpExpires) {
+    return { error: "Send a verification code first." };
+  }
+  if (user.phoneOtpExpires.getTime() < Date.now()) {
+    return { error: "That code expired. Send a new one." };
+  }
+  if (!(await compare(code, user.phoneOtpHash))) {
+    return { error: "That code is incorrect." };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      phoneVerified: true,
+      phoneOtpHash: null,
+      phoneOtpExpires: null,
+    },
+  });
+
+  revalidatePath("/profile");
+  revalidatePath(`/profile/${user.id}`);
+  redirect("/dashboard");
+}

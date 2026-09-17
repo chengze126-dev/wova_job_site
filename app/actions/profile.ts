@@ -2,6 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
+import { redirect, RedirectType } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseSkills } from "@/lib/constants";
@@ -11,6 +12,7 @@ import { savePublicUpload } from "@/lib/uploads";
 async function saveExtras(userId: string, extras: ProfileExtras) {
   await prisma.user.update({ where: { id: userId }, data: { extras: stringifyExtras(extras) } });
   revalidatePath("/profile");
+  revalidatePath("/profile/settings");
   revalidatePath(`/profile/${userId}`);
   revalidatePath("/talents");
 }
@@ -68,9 +70,10 @@ export async function updateProfileBasics(formData: FormData) {
 
   await prisma.user.update({ where: { id: user.id }, data });
   revalidatePath("/profile");
+  revalidatePath("/profile/settings");
   revalidatePath(`/profile/${user.id}`);
   revalidatePath("/talents");
-  return { ok: true };
+  redirect("/profile/settings", RedirectType.replace);
 }
 
 export async function toggleAvailableNow() {

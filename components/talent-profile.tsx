@@ -7,7 +7,6 @@ import { parseExtras } from "@/lib/profile-extras";
 import { formatCompactUsd, formatDate, formatHourly, formatMoney } from "@/lib/utils";
 import { TalentLogo } from "@/components/badges";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { AvatarInput } from "@/components/avatar-input";
 import { startConversation } from "@/app/actions/messages";
 import {
   addCertification,
@@ -22,7 +21,6 @@ import {
   removeOtherExperience,
   removePortfolio,
   toggleAvailableNow,
-  updateProfileBasics,
 } from "@/app/actions/profile";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -110,15 +108,15 @@ export function TalentProfile({
                   badge={profile.talentBadge}
                 />
                 {editing ? (
-                  <a
-                    href="#profile-settings"
+                  <Link
+                    href="/profile/settings"
                     className={`absolute inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#14a800] bg-cream text-[#14a800] ${
                       profile.talentBadge ? "-bottom-0.5 -left-0.5" : "bottom-0 right-0"
                     }`}
                     aria-label="Change photo"
                   >
                     <Pencil size={14} />
-                  </a>
+                  </Link>
                 ) : null}
               </div>
               <div className="min-w-0">
@@ -152,12 +150,12 @@ export function TalentProfile({
                   >
                     See public view
                   </Link>
-                  <a
-                    href="#profile-settings"
+                  <Link
+                    href="/profile/settings"
                     className="rounded-full bg-[#14a800] px-5 py-2 text-sm font-semibold text-white hover:bg-[#13a000]"
                   >
                     Profile settings
-                  </a>
+                  </Link>
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#14a800] text-[#14a800]">
                     <Share2 size={16} />
                   </span>
@@ -192,7 +190,7 @@ export function TalentProfile({
                 <p className="mt-1 text-[12px] text-muted">Total jobs</p>
               </div>
               <div>
-                <p className="text-[22px] font-semibold">{hours.toLocaleString()}</p>
+                <p className="text-[22px] font-semibold">{hours.toLocaleString("en-US")}</p>
                 <p className="mt-1 text-[12px] text-muted">Total hours</p>
               </div>
             </section>
@@ -241,7 +239,7 @@ export function TalentProfile({
                   <p className="mt-1 text-sm text-muted">{extras.hoursPerWeek}</p>
                   {extras.availableNow ? <p className="mt-1 text-sm text-[#14a800]">Open to contract to hire</p> : null}
                 </div>
-                {editing ? <PencilLink href="#profile-settings" /> : null}
+                {editing ? <PencilLink href="/profile/settings" /> : null}
               </div>
               <div className="mt-5">
                 <p className="font-semibold">Avg. response</p>
@@ -366,7 +364,7 @@ export function TalentProfile({
                 </h2>
                 <div className="flex items-center gap-2">
                   {rate ? <p className="text-[22px] font-semibold">{rate}</p> : null}
-                  {editing ? <PencilLink href="#profile-settings" /> : null}
+                  {editing ? <PencilLink href="/profile/settings" /> : null}
                 </div>
               </div>
               <div className="mt-5">
@@ -493,7 +491,7 @@ export function TalentProfile({
             </section>
 
             <section className={cardClass}>
-              <SectionHead title="Skills" action={editing ? <PencilLink href="#profile-settings" /> : null} />
+              <SectionHead title="Skills" action={editing ? <PencilLink href="/profile/settings" /> : null} />
               <div className="flex flex-wrap gap-2">
                 {skills.map((skill) => (
                   <span key={skill} className="rounded-full bg-paper-2 px-3 py-1.5 text-sm text-ink">
@@ -650,63 +648,18 @@ export function TalentProfile({
               )}
             </section>
 
-            {editing && !profile.talentBadge ? (
+            {editing ? (
               <section className={cardClass}>
-                <h3 className="text-lg font-semibold">Skill test is optional</h3>
+                <h3 className="text-lg font-semibold">Skill test</h3>
                 <p className="mt-2 text-sm text-muted">
-                  Pass the camera-proctored test when you want a Talent badge for high-badge jobs.
+                  Choose a stack and answer 10 problems. Passing adds a Talent badge for high-badge jobs.
                 </p>
-                <Link href="/skill-test" className="mt-4 inline-flex rounded-full bg-[#14a800] px-4 py-2 text-sm font-semibold">
-                  Take the skill test
+                <Link href="/skill-test" className="mt-4 inline-flex rounded-full bg-[#14a800] px-4 py-2 text-sm font-semibold text-white">
+                  Go to skill testing
                 </Link>
               </section>
             ) : null}
 
-            {editing ? (
-              <section id="profile-settings" className={cardClass}>
-                <h3 className="text-[22px] font-semibold">Profile settings</h3>
-                <form action={updateProfileBasics} className="mt-5 space-y-4">
-                  <AvatarInput personName={profile.name} currentSrc={profile.avatarUrl} required={!profile.avatarUrl} />
-                  <label className="block text-sm">
-                    Name
-                    <input name="name" defaultValue={profile.name} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    City
-                    <input name="city" defaultValue={extras.city || ""} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    Title
-                    <input name="title" defaultValue={profile.title || ""} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    Hourly rate (USD)
-                    <input name="hourlyRate" type="number" min={5} max={500} defaultValue={profile.hourlyRate ?? 40} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    Hours per week
-                    <input name="hoursPerWeek" defaultValue={extras.hoursPerWeek} className={fieldClass} />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="availableNow" defaultChecked={extras.availableNow} className="accent-[#14a800]" />
-                    Open for work
-                  </label>
-                  <label className="block text-sm">
-                    GitHub URL
-                    <input name="githubUrl" defaultValue={extras.githubUrl || ""} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    Skills (comma-separated)
-                    <input name="skills" defaultValue={skills.join(", ")} className={fieldClass} />
-                  </label>
-                  <label className="block text-sm">
-                    Overview
-                    <textarea name="bio" rows={8} defaultValue={profile.bio || ""} className={fieldClass} />
-                  </label>
-                  <SubmitButton className="!rounded-full !bg-[#14a800]">Save profile</SubmitButton>
-                </form>
-              </section>
-            ) : null}
           </div>
         </div>
 

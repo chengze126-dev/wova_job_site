@@ -8,9 +8,10 @@ export const STANDARD_CONNECT_COST = 10;
 export const HIGH_BADGE_CONNECT_COSTS = [15, 16, 17, 18, 19, 20] as const;
 export const SKILL_PASS_SCORE = 70;
 export const SKILL_QUESTION_COUNT = 10;
-export const SKILL_MCQ_COUNT = 7;
-export const SKILL_CODE_COUNT = 3;
+export const SKILL_MCQ_COUNT = 10;
+export const SKILL_CODE_COUNT = 0;
 export const SKILL_TIME_MINUTES = 20;
+export const PROBLEMS_PER_STACK = 1000;
 
 export const COMPANY_SIZES = [
   { value: "1", label: "Just me" },

@@ -36,7 +36,7 @@ export function ProfileAvatar({
         )}
       </span>
       {badge ? (
-        <span className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-paper">
+        <span className="pointer-events-none absolute -bottom-0.5 -right-0.5">
           <TalentLogo size={badgeSize} />
         </span>
       ) : null}

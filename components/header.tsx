@@ -75,6 +75,11 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
               <Link href="/dashboard" className={`hidden sm:inline ${linkClass}`}>
                 Dashboard
               </Link>
+              {user.role === "TALENT" ? (
+                <Link href="/skill-test" className={`hidden sm:inline ${linkClass}`}>
+                  Skill test
+                </Link>
+              ) : null}
               {user.role !== "ADMIN" ? (
                 <Link href={`/profile/${user.id}`} className={`hidden sm:inline ${linkClass}`}>
                   Profile
@@ -149,6 +154,11 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
                 <Link href="/dashboard" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
                   Dashboard
                 </Link>
+                {user.role === "TALENT" ? (
+                  <Link href="/skill-test" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
+                    Skill test
+                  </Link>
+                ) : null}
                 {user.role !== "ADMIN" ? (
                   <Link
                     href={`/profile/${user.id}`}

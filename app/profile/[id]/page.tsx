@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
-import { updateProfile } from "@/app/actions/auth";
 import { TalentProfile } from "@/components/talent-profile";
 
 export default async function PublicProfilePage({
@@ -53,18 +52,12 @@ export default async function PublicProfilePage({
         </form>
       ) : null}
       {isSelf ? (
-        <form action={updateProfile} className="mt-10 space-y-3 rounded-2xl border border-line bg-cream p-6">
-          <h2 className="font-display text-2xl">Edit profile</h2>
-          <label className="block text-sm">
-            Name
-            <input name="name" defaultValue={profile.name} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-          </label>
-          <label className="block text-sm">
-            Bio
-            <textarea name="bio" defaultValue={profile.bio || ""} rows={4} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-          </label>
-          <SubmitButton>Save</SubmitButton>
-        </form>
+        <Link
+          href="/profile/settings"
+          className="mt-8 inline-flex rounded-full bg-[#14a800] px-5 py-2 text-sm font-semibold text-white hover:bg-[#13a000]"
+        >
+          Profile settings
+        </Link>
       ) : null}
       <p className="mt-8 text-sm">
         <Link href="/talents" className="underline decoration-copper/40">

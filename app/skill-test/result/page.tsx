@@ -22,23 +22,17 @@ export default async function SkillTestResultPage({
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted">
-          You need 70% with the camera on. Multiple-choice and coding questions both count. Coding is
-          marked correct only when every test answer matches. Try again when you are ready.
+          You need 70% with the camera on. Each test is 10 questions from a 1,000-problem stack. Try another
+          stack when you are ready.
         </p>
       )}
       <div className="mt-8 flex justify-center gap-3">
         <Link href="/profile" className="rounded-full bg-[#0db64b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0aa542]">
           View profile
         </Link>
-        {!passed ? (
           <Link href="/skill-test" className="rounded-full border border-ink/20 px-5 py-2.5 text-sm">
-            Retry test
+            Take another stack
           </Link>
-        ) : (
-          <Link href="/dashboard" className="rounded-full border border-ink/20 px-5 py-2.5 text-sm">
-            Dashboard
-          </Link>
-        )}
       </div>
     </div>
   );

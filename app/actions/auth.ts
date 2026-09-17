@@ -267,9 +267,10 @@ export async function updateProfile(formData: FormData) {
 
   await prisma.user.update({ where: { id: user.id }, data });
   revalidatePath("/profile");
+  revalidatePath("/profile/settings");
   revalidatePath(`/profile/${user.id}`);
   revalidatePath("/talents");
-  return { ok: true };
+  redirect("/profile/settings");
 }
 
 function randomOtp() {

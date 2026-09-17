@@ -160,6 +160,9 @@ async function renderDashboard() {
           <Link href="/connects" className="rounded-full border border-ink/20 px-4 py-2 text-sm">
             Buy connects
           </Link>
+          <Link href="/skill-test" className="rounded-full border border-ink/20 px-4 py-2 text-sm">
+            Skill test
+          </Link>
           <Link
             href="/jobs"
             className="workora-cta rounded-full bg-[#0db64b] px-4 py-2 text-sm font-semibold transition hover:bg-[#0aa542]"
@@ -168,21 +171,19 @@ async function renderDashboard() {
           </Link>
         </div>
       </div>
-      {!user.skillTestPassed ? (
-        <div className="mt-8 rounded-2xl border border-line bg-cream p-5">
-          <h2 className="font-display text-2xl">Skill test is optional</h2>
+      <div className="mt-8 rounded-2xl border border-line bg-cream p-5">
+          <h2 className="font-display text-2xl">Skill test</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Your profile is enough to apply to most jobs. Take the camera-proctored test when you want a
-            Talent badge for high-badge roles.
+            Pick a stack, answer 10 of 1000 problems, and earn a Talent badge for high-badge jobs. You can take
+            another stack anytime.
           </p>
           <Link
             href="/skill-test"
             className="mt-4 inline-flex rounded-full bg-[#0db64b] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0aa542]"
           >
-            Take the skill test
+            Go to skill testing
           </Link>
         </div>
-      ) : null}
       <h2 className="font-display mt-12 text-3xl">Your proposals</h2>
       <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-cream">
         {applications.length === 0 ? (

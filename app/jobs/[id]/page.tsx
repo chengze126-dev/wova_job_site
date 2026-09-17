@@ -44,6 +44,8 @@ export default async function JobDetailPage({
           {job.highBadge ? <HighBadge cost={job.connectCost} /> : <span>{job.connectCost} connects to apply</span>}
         </div>
         <h1 className="font-display mt-3 text-4xl leading-tight">{job.title}</h1>
+        <p className="mt-3 text-sm font-medium text-brand">{job.jobType}</p>
+        <p className="mt-0.5 text-sm text-muted">{job.duration}</p>
         <p className="mt-3 text-muted">
           {job.client.companyName} · {job.client.companySize} · {job.client.companyIndustry}
         </p>

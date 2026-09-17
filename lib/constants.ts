@@ -73,6 +73,41 @@ export const COUNTRIES = [
   "Other",
 ];
 
+export const JOB_TYPES = ["Full-time", "Part-time", "Contract", "Temporary"] as const;
+export const JOB_DURATIONS = [
+  "Less than 1 month",
+  "1–3 months",
+  "3–6 months",
+  "More than 6 months",
+] as const;
+
+export function jobTypeFromTitle(title: string) {
+  const t = title.toLowerCase();
+  if (t.includes("part-time")) return "Part-time";
+  if (t.includes("photographer") || t.includes("shoot 40")) return "Temporary";
+  if (t.includes("android engineer") || t.includes("driver android") || t.includes("full ehr")) return "Full-time";
+  return "Contract";
+}
+
+export function jobDurationFromTitle(title: string) {
+  const t = title.toLowerCase();
+  if (t.includes("ongoing") || t.includes("bookkeeper")) return "More than 6 months";
+  if (
+    t.includes("2–3 weeks") ||
+    t.includes("2-3 weeks") ||
+    t.includes("week after next") ||
+    t.includes("40 skus") ||
+    t.includes("hipaa") ||
+    t.includes("excel model")
+  ) {
+    return "Less than 1 month";
+  }
+  if (t.includes("12 weeks") || t.includes("android") || t.includes("design system") || t.includes("ehr rewrite")) {
+    return "3–6 months";
+  }
+  return "1–3 months";
+}
+
 export const JOB_CATEGORIES = [
   "Web Development",
   "Mobile Development",

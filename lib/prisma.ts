@@ -4,6 +4,8 @@ import fs from "fs";
 import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
+import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
+import { marketplaceJobs } from "../prisma/marketplace-data";
 
 type Dict = Record<string, unknown>;
 
@@ -149,6 +151,8 @@ function migrate(instance: DatabaseSync) {
       budgetMin INTEGER,
       budgetMax INTEGER,
       budgetType TEXT NOT NULL DEFAULT 'fixed',
+      jobType TEXT NOT NULL DEFAULT 'Full-time',
+      duration TEXT NOT NULL DEFAULT '1–3 months',
       highBadge INTEGER NOT NULL DEFAULT 0,
       connectCost INTEGER NOT NULL DEFAULT 10,
       status TEXT NOT NULL DEFAULT 'OPEN',
@@ -226,6 +230,17 @@ function migrate(instance: DatabaseSync) {
     instance.exec("ALTER TABLE User ADD COLUMN country TEXT");
   } catch {
     // column already exists
+  }
+  for (const column of ["jobType TEXT NOT NULL DEFAULT 'Full-time'", "duration TEXT NOT NULL DEFAULT '1–3 months'"]) {
+    try {
+      instance.exec(`ALTER TABLE Job ADD COLUMN ${column}`);
+    } catch {
+      // column already exists
+    }
+  }
+  const jobMeta = instance.prepare("UPDATE Job SET jobType = ?, duration = ? WHERE title = ?");
+  for (const item of marketplaceJobs) {
+    jobMeta.run(jobTypeFromTitle(item.title), jobDurationFromTitle(item.title), item.title);
   }
   try {
     instance.exec("ALTER TABLE Application ADD COLUMN attachmentUrl TEXT");
@@ -424,6 +439,8 @@ function mapJob(row: Dict) {
     budgetMin: row.budgetMin == null ? null : Number(row.budgetMin),
     budgetMax: row.budgetMax == null ? null : Number(row.budgetMax),
     budgetType: String(row.budgetType),
+    jobType: String(row.jobType || jobTypeFromTitle(String(row.title))),
+    duration: String(row.duration || jobDurationFromTitle(String(row.title))),
     highBadge: asBool(row.highBadge),
     connectCost: Number(row.connectCost),
     status: String(row.status),
@@ -725,8 +742,8 @@ export const prisma = {
       const jobId = String(data.id ?? id());
       db()
         .prepare(
-          `INSERT INTO Job (id, title, description, category, skills, budgetMin, budgetMax, budgetType, highBadge, connectCost, status, clientId, createdAt)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO Job (id, title, description, category, skills, budgetMin, budgetMax, budgetType, jobType, duration, highBadge, connectCost, status, clientId, createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           jobId,
@@ -737,6 +754,8 @@ export const prisma = {
           data.budgetMin ?? null,
           data.budgetMax ?? null,
           data.budgetType ?? "fixed",
+          data.jobType ?? jobTypeFromTitle(String(data.title ?? "")),
+          data.duration ?? jobDurationFromTitle(String(data.title ?? "")),
           toBool(data.highBadge),
           Number(data.connectCost ?? 10),
           data.status ?? "OPEN",

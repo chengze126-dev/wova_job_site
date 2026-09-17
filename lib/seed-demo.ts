@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { extraClients, marketplaceJobs } from "../prisma/marketplace-data";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
+import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
 
 const questions = [
   {
@@ -287,6 +288,8 @@ export async function seedDemoData() {
         budgetMin: item.budgetMin,
         budgetMax: item.budgetMax,
         budgetType: item.budgetType,
+        jobType: jobTypeFromTitle(item.title),
+        duration: jobDurationFromTitle(item.title),
         highBadge: item.highBadge,
         connectCost: item.connectCost,
         status: item.status,

@@ -24,7 +24,7 @@ export default async function HomePage() {
       <section id="companies" className="mx-auto w-[92%] max-w-[1308px] pb-[22px] pt-[24px]">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-[16px] font-bold tracking-[-0.025em] text-ink sm:text-[18px]">Top Companies Hiring</h2>
-          <Link href="/jobs" className="shrink-0 text-[11px] font-semibold text-[#16a34a] hover:underline">
+          <Link href="/companies" className="shrink-0 text-[11px] font-semibold text-[#16a34a] hover:underline">
             <span className="sm:hidden">View all →</span>
             <span className="hidden sm:inline">View all companies →</span>
           </Link>

@@ -6,7 +6,7 @@ const leaders = [
     name: "Dieudonne Awa",
     role: "Chief Executive Officer",
     title: "CEO",
-    image: "/about/ceo-office.jpg",
+    image: "/about/ceo-framed.jpg",
     alt: "Dieudonne Awa, CEO of Wova",
     bio: "Leads Wova’s product and company direction so clients and talent can hire, work, and get paid in one place.",
   },
@@ -14,7 +14,7 @@ const leaders = [
     name: "Tim Demars",
     role: "Chief Technology Officer",
     title: "CTO",
-    image: "/about/cto-office.jpg",
+    image: "/about/cto-match.jpg",
     alt: "Tim Demars, CTO of Wova",
     bio: "Builds the marketplace, skill tests, and trust systems that keep hiring on Wova fast and fair.",
   },
@@ -42,16 +42,15 @@ export default function AboutPage() {
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           {leaders.map((person) => (
-            <article key={person.name} className="overflow-hidden rounded-2xl border border-line bg-cream">
-              <div className="relative h-[340px] overflow-hidden bg-paper-2 sm:h-[420px]">
+            <article key={person.name} className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-cream">
+              <div className="relative h-[400px] overflow-hidden bg-paper-2 sm:h-[460px]">
                 <Image
                   src={person.image}
                   alt={person.alt}
                   fill
                   sizes="(max-width: 768px) 92vw, 500px"
-                  className="object-cover object-[50%_12%] brightness-[1.02] contrast-[0.98] saturate-[0.92]"
+                  className="object-cover object-top"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-[#f4efe6]/12" />
               </div>
               <div className="p-5">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#0db64b]">{person.title}</p>

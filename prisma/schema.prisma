@@ -55,6 +55,8 @@ model Job {
   budgetMin    Int?
   budgetMax    Int?
   budgetType   String   @default("fixed")
+  jobType      String   @default("Full-time")
+  duration     String   @default("1–3 months")
   highBadge    Boolean  @default(false)
   connectCost  Int      @default(10)
   status       String   @default("OPEN")

@@ -15,12 +15,20 @@ export function ProfileAvatar({
 }) {
   const letters = initials(name) || "W";
   const badgeSize = Math.max(18, Math.round(size * 0.38));
+  const ring = badge ? Math.max(3, Math.round(size * 0.055)) : 0;
 
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
       <span
-        className="overflow-hidden rounded-full bg-paper-2 text-center font-semibold text-pine"
-        style={{ width: size, height: size, fontSize: Math.max(14, size * 0.32) }}
+        className={`overflow-hidden rounded-full bg-paper-2 text-center font-semibold text-pine ${
+          badge ? "box-border" : ""
+        }`}
+        style={{
+          width: size,
+          height: size,
+          fontSize: Math.max(14, size * 0.32),
+          border: badge ? `${ring}px solid #14a800` : undefined,
+        }}
       >
         {src ? (
           // Native img avoids next/image hydration mismatches on this page.

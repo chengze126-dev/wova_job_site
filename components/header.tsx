@@ -11,8 +11,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 const navLinks = [
   { href: "/jobs", label: "Jobs" },
-  { href: "/#companies", label: "Companies" },
-  { href: "/jobs", label: "Salaries" },
+  { href: "/companies", label: "Companies" },
   { href: "/#resources", label: "Resources" },
 ];
 

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createJob } from "@/app/actions/jobs";
-import { HIGH_BADGE_CONNECT_COSTS, JOB_CATEGORIES, STANDARD_CONNECT_COST } from "@/lib/constants";
+import { HIGH_BADGE_CONNECT_COSTS, JOB_CATEGORIES, JOB_DURATIONS, JOB_TYPES, STANDARD_CONNECT_COST } from "@/lib/constants";
 import { SubmitButton } from "@/components/submit-button";
 
 export function NewJobForm() {
@@ -35,6 +35,24 @@ export function NewJobForm() {
         Skills (comma separated)
         <input name="skills" required placeholder="React, Figma, Writing" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
       </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm">
+          Job type
+          <select name="jobType" required className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2">
+            {JOB_TYPES.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          Duration
+          <select name="duration" required className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2">
+            {JOB_DURATIONS.map((period) => (
+              <option key={period}>{period}</option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block text-sm">
           Budget min
@@ -45,7 +63,7 @@ export function NewJobForm() {
           <input name="budgetMax" type="number" min={0} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
         </label>
         <label className="block text-sm">
-          Type
+          Pay type
           <select name="budgetType" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2">
             <option value="fixed">Fixed</option>
             <option value="hourly">Hourly</option>

@@ -10,6 +10,8 @@ import {
   clientReady,
   HIGH_BADGE_CONNECT_COSTS,
   JOB_CATEGORIES,
+  JOB_DURATIONS,
+  JOB_TYPES,
   STANDARD_CONNECT_COST,
   talentReady,
 } from "@/lib/constants";
@@ -30,12 +32,16 @@ export async function createJob(formData: FormData) {
   const budgetMin = Number(formData.get("budgetMin") || 0);
   const budgetMax = Number(formData.get("budgetMax") || 0);
   const budgetType = String(formData.get("budgetType") || "fixed");
+  const jobType = String(formData.get("jobType") || "").trim();
+  const duration = String(formData.get("duration") || "").trim();
   const highBadge = formData.get("highBadge") === "on";
   const connectCost = Number(formData.get("connectCost") || STANDARD_CONNECT_COST);
 
   if (title.length < 8) return { error: "Give the job a clearer title." };
   if (description.length < 40) return { error: "Describe the work in at least a short paragraph." };
   if (!JOB_CATEGORIES.includes(category)) return { error: "Pick a category." };
+  if (!(JOB_TYPES as readonly string[]).includes(jobType)) return { error: "Pick a job type." };
+  if (!(JOB_DURATIONS as readonly string[]).includes(duration)) return { error: "Pick a project length." };
   if (skills.length === 0) return { error: "Add at least one skill." };
   const highCosts: number[] = [...HIGH_BADGE_CONNECT_COSTS];
   if (highBadge && !highCosts.includes(connectCost)) {
@@ -54,6 +60,8 @@ export async function createJob(formData: FormData) {
       budgetMin: budgetMin || null,
       budgetMax: budgetMax || null,
       budgetType: budgetType === "hourly" ? "hourly" : "fixed",
+      jobType,
+      duration,
       highBadge,
       connectCost: highBadge ? connectCost : STANDARD_CONNECT_COST,
       clientId: user.id,

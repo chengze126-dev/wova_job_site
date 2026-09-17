@@ -8,9 +8,15 @@ type Dict = Record<string, unknown>;
 
 const globalForDb = globalThis as unknown as { hirelineDb?: DatabaseSync };
 
+function dataDir() {
+  // Vercel’s serverless filesystem is read-only except /tmp.
+  if (process.env.VERCEL) return "/tmp/wova-data";
+  return path.join(process.cwd(), "data");
+}
+
 function db() {
   if (globalForDb.hirelineDb) return globalForDb.hirelineDb;
-  const dir = path.join(process.cwd(), "data");
+  const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
   const instance = new DatabaseSync(path.join(dir, "hireline.db"));
   instance.exec("PRAGMA foreign_keys = ON;");

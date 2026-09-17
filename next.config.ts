@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
-      allowedOrigins: ["www.wova.cc", "wova.cc"],
+      allowedOrigins: ["www.wova.cc", "wova.cc", "*.vercel.app"],
     },
   },
 };

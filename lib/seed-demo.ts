@@ -132,6 +132,7 @@ export async function seedDemoData() {
 
   await prisma.user.create({
     data: {
+      id: "wova-user-admin",
       email: "admin@hireline.local",
       passwordHash: adminPassword,
       role: "ADMIN",
@@ -143,6 +144,7 @@ export async function seedDemoData() {
 
   const client = await prisma.user.create({
     data: {
+      id: "wova-user-jordan",
       email: "jordan@northfield.co",
       passwordHash: password,
       role: "CLIENT",
@@ -162,6 +164,7 @@ export async function seedDemoData() {
 
   const client2 = await prisma.user.create({
     data: {
+      id: "wova-user-priya",
       email: "priya@lumenops.com",
       passwordHash: password,
       role: "CLIENT",
@@ -181,6 +184,7 @@ export async function seedDemoData() {
 
   const talent = await prisma.user.create({
     data: {
+      id: "wova-user-maya",
       email: "maya@talent.test",
       passwordHash: password,
       role: "TALENT",
@@ -205,6 +209,7 @@ export async function seedDemoData() {
 
   const talent2 = await prisma.user.create({
     data: {
+      id: "wova-user-diego",
       email: "diego@talent.test",
       passwordHash: password,
       role: "TALENT",
@@ -249,6 +254,7 @@ export async function seedDemoData() {
         companyLocation: extra.companyLocation,
         paymentConnected: true,
         bio: extra.bio,
+        id: `wova-user-${extra.key}`,
       },
     });
     clientsByKey[extra.key] = created.id;

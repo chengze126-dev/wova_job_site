@@ -37,6 +37,7 @@ yarn-error.log*
 # sqlite
 /data/*.db
 /data/*.db-journal
+!/data/demo.db
 /prisma/dev.db
 /prisma/dev.db-journal
 /prisma/*.db

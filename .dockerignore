@@ -3,6 +3,7 @@ node_modules
 .git
 data/*.db
 data/*.db-journal
+!data/demo.db
 .env
 .env.*
 !.env.example

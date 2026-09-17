@@ -12,6 +12,28 @@ import { startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 
 export default async function DashboardPage() {
+  try {
+    return await renderDashboard();
+  } catch (error) {
+    const digest =
+      typeof error === "object" && error && "digest" in error ? String((error as { digest?: string }).digest) : "";
+    if (digest.includes("NEXT_REDIRECT") || digest.includes("NEXT_NOT_FOUND")) throw error;
+    console.error("Dashboard failed", error);
+    return (
+      <div className="mx-auto max-w-md px-5 py-24 text-center">
+        <h1 className="text-2xl font-bold">Dashboard could not load</h1>
+        <p className="mt-3 text-sm text-muted">
+          Reload the page. If this keeps happening, log in again with a demo account.
+        </p>
+        <Link href="/login" className="mt-6 inline-flex rounded-full bg-[#0db64b] px-5 py-2 text-sm font-semibold text-white">
+          Back to login
+        </Link>
+      </div>
+    );
+  }
+}
+
+async function renderDashboard() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role === "ADMIN") redirect("/admin");
@@ -76,16 +98,16 @@ export default async function DashboardPage() {
                 <li key={app.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div>
                     <p className="flex items-center gap-2 font-medium">
-                      <ProfileAvatar name={app.talent.name} src={app.talent.avatarUrl} size={28} badge={app.talent.talentBadge} />
-                      {app.talent.name}
-                      {app.talent.talentBadge ? <TalentBadge compact /> : null}
+                      <ProfileAvatar name={app.talent?.name || "Talent"} src={app.talent?.avatarUrl} size={28} badge={app.talent?.talentBadge} />
+                      {app.talent?.name || "Talent"}
+                      {app.talent?.talentBadge ? <TalentBadge compact /> : null}
                     </p>
                     <p className="text-sm text-muted">
-                      {app.job.title} · {app.status} · {formatDate(app.createdAt)}
+                      {app.job?.title || "Job"} · {app.status} · {formatDate(app.createdAt)}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Link href={`/profile/${app.talent.id}`} className="rounded-full border border-line px-3 py-1 text-xs">
+                    <Link href={`/profile/${app.talent?.id}`} className="rounded-full border border-line px-3 py-1 text-xs">
                       Profile
                     </Link>
                     <form action={updateApplicationStatus.bind(null, app.id, "SHORTLISTED")}>
@@ -170,14 +192,14 @@ export default async function DashboardPage() {
             {applications.map((app) => (
               <li key={app.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div>
-                  <Link href={`/jobs/${app.job.id}`} className="font-medium hover:underline">
-                    {app.job.title}
+                  <Link href={`/jobs/${app.job?.id}`} className="font-medium hover:underline">
+                    {app.job?.title || "Job"}
                   </Link>
                   <p className="text-sm text-muted">
-                    {app.job.client.companyName} · {app.status} · {app.connectsUsed} connects
+                    {app.job?.client?.companyName || "Client"} · {app.status} · {app.connectsUsed} connects
                   </p>
                 </div>
-                {app.status === "HIRED" ? (
+                {app.status === "HIRED" && app.job?.clientId ? (
                   <form action={startConversation.bind(null, app.job.clientId)}>
                     <button className="text-sm underline decoration-copper/40">Message client</button>
                   </form>

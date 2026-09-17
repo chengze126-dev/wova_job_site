@@ -9,6 +9,8 @@ import { getSession } from "@/lib/auth";
 import { siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 
+export const runtime = "nodejs";
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],

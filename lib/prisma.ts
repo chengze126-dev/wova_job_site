@@ -1,6 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "crypto";
-import { AsyncLocalStorage } from "async_hooks";
 import fs from "fs";
 import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
@@ -13,39 +12,69 @@ const globalForDb = globalThis as unknown as {
   hirelineSeeded?: boolean;
   hirelineSeedPromise?: Promise<void>;
 };
-const seedContext = new AsyncLocalStorage<boolean>();
 
 function dataDir() {
+  if (process.env.WOVA_DATA_DIR) return process.env.WOVA_DATA_DIR;
   // Vercel’s serverless filesystem is read-only except /tmp.
   if (process.env.VERCEL) return "/tmp/wova-data";
   return path.join(process.cwd(), "data");
+}
+
+function demoDbPath() {
+  return path.join(process.cwd(), "data", "demo.db");
+}
+
+function openSqlite(file: string) {
+  const instance = new DatabaseSync(file);
+  instance.exec("PRAGMA foreign_keys = ON;");
+  migrate(instance);
+  return instance;
+}
+
+function userCount(instance: DatabaseSync) {
+  const row = instance.prepare("SELECT COUNT(*) AS c FROM User").get() as { c: number } | undefined;
+  return Number(row?.c ?? 0);
 }
 
 function db() {
   if (globalForDb.hirelineDb) return globalForDb.hirelineDb;
   const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
-  const instance = new DatabaseSync(path.join(dir, "hireline.db"));
-  instance.exec("PRAGMA foreign_keys = ON;");
-  migrate(instance);
+  const dest = path.join(dir, "hireline.db");
+  const seedFile = demoDbPath();
+  if (!fs.existsSync(dest) && fs.existsSync(seedFile)) {
+    fs.copyFileSync(seedFile, dest);
+  }
+  let instance = openSqlite(dest);
+  if (userCount(instance) === 0 && fs.existsSync(seedFile) && path.resolve(seedFile) !== path.resolve(dest)) {
+    instance.close();
+    fs.copyFileSync(seedFile, dest);
+    instance = openSqlite(dest);
+  }
   globalForDb.hirelineDb = instance;
   return instance;
 }
 
 async function ensureDemoSeed() {
-  if (globalForDb.hirelineSeeded || seedContext.getStore()) return;
-  const row = db().prepare("SELECT COUNT(*) AS c FROM User").get() as { c: number } | undefined;
-  if (row && Number(row.c) > 0) {
+  if (globalForDb.hirelineSeeded) return;
+  if (userCount(db()) > 0) {
     globalForDb.hirelineSeeded = true;
     return;
   }
-  if (!globalForDb.hirelineSeedPromise) {
-    globalForDb.hirelineSeedPromise = seedContext.run(true, async () => {
+  if (globalForDb.hirelineSeedPromise) {
+    await globalForDb.hirelineSeedPromise;
+    return;
+  }
+  globalForDb.hirelineSeedPromise = (async () => {
+    try {
       const { seedDemoData } = await import("./seed-demo");
       await seedDemoData();
       globalForDb.hirelineSeeded = true;
-    });
-  }
+    } catch (error) {
+      console.error("Demo seed failed", error);
+      globalForDb.hirelineSeedPromise = undefined;
+    }
+  })();
   await globalForDb.hirelineSeedPromise;
 }
 
@@ -464,7 +493,7 @@ export const prisma = {
       return Number(row.c);
     },
     async create({ data }: { data: Dict }) {
-      const userId = id();
+      const userId = String(data.id ?? id());
       const createdAt = now();
       db()
         .prepare(
@@ -567,7 +596,6 @@ export const prisma = {
   },
   job: {
     async findUnique({ where, include }: { where: { id: string }; include?: Dict }) {
-      await ensureDemoSeed();
       const row = db().prepare("SELECT * FROM Job WHERE id = ?").get(where.id) as Dict | undefined;
       if (!row) return null;
       const job = mapJob(row);
@@ -664,7 +692,7 @@ export const prisma = {
       return Number(row.c);
     },
     async create({ data }: { data: Dict }) {
-      const jobId = id();
+      const jobId = String(data.id ?? id());
       db()
         .prepare(
           `INSERT INTO Job (id, title, description, category, skills, budgetMin, budgetMax, budgetType, highBadge, connectCost, status, clientId, createdAt)
@@ -699,6 +727,52 @@ export const prisma = {
     },
   },
   application: {
+    async findFirst({ where = {}, select }: { where?: Dict; select?: Dict } = {}) {
+      const clauses: string[] = [];
+      const params: unknown[] = [];
+      if (where.status) {
+        clauses.push("status = ?");
+        params.push(where.status);
+      }
+      if (where.talentId) {
+        clauses.push("talentId = ?");
+        params.push(where.talentId);
+      }
+      if (where.jobId) {
+        clauses.push("jobId = ?");
+        params.push(where.jobId);
+      }
+      if (where.OR) {
+        const orParts = (where.OR as Dict[]).map((item) => {
+          const parts: string[] = [];
+          if (item.talentId) {
+            parts.push("talentId = ?");
+            params.push(item.talentId);
+          }
+          if (item.job && (item.job as Dict).clientId) {
+            parts.push("jobId IN (SELECT id FROM Job WHERE clientId = ?)");
+            params.push((item.job as Dict).clientId);
+          }
+          return `(${parts.join(" AND ")})`;
+        });
+        clauses.push(`(${orParts.join(" OR ")})`);
+      }
+      const row = db()
+        .prepare(
+          `SELECT * FROM Application ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} LIMIT 1`,
+        )
+        .get(...params) as Dict | undefined;
+      if (!row) return null;
+      const app = mapApplication(row);
+      if (select) {
+        const picked: Dict = {};
+        for (const key of Object.keys(select)) {
+          if (select[key]) picked[key] = (app as Dict)[key];
+        }
+        return picked;
+      }
+      return app;
+    },
     async findUnique({ where, include }: { where: Dict; include?: Dict }) {
       let row: Dict | undefined;
       if (where.id) row = db().prepare("SELECT * FROM Application WHERE id = ?").get(where.id) as Dict | undefined;

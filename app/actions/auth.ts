@@ -79,15 +79,22 @@ export async function loginUser(formData: FormData) {
     return { error: "Oops! The email or password you entered is incorrect." };
   }
 
-  await createSession(
-    {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role as "ADMIN" | "CLIENT" | "TALENT",
-    },
-    { remember },
-  );
+  try {
+    await createSession(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role as "ADMIN" | "CLIENT" | "TALENT",
+      },
+      { remember },
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("AUTH_SECRET")) {
+      return { error: "Server auth is not configured. Add AUTH_SECRET in Vercel environment variables." };
+    }
+    throw error;
+  }
 
   if (!user.onboardingDone && user.role !== "ADMIN") redirect("/onboarding");
   if (user.role === "ADMIN") redirect("/admin");

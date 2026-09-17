@@ -207,10 +207,6 @@ export function TalentProfile({
                       </SubmitButton>
                     </form>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span>Boost your profile</span>
-                    <span className="text-muted">Off</span>
-                  </div>
                 </section>
                 <section className={cardClass}>
                   <p className="text-lg font-semibold">Connects: {profile.connects}</p>

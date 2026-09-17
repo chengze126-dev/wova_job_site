@@ -36,6 +36,7 @@ export default async function DashboardPage() {
 async function renderDashboard() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!user.emailVerified) redirect("/verify-email");
   if (user.role === "ADMIN") redirect("/admin");
   if (!user.onboardingDone) redirect("/onboarding");
 

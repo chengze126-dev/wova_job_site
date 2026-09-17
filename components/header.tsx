@@ -16,7 +16,7 @@ const navLinks = [
   { href: "/#resources", label: "Resources" },
 ];
 
-const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password"]);
+const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/verify-email"]);
 
 export function Header({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();

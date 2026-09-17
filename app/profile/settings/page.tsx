@@ -9,6 +9,7 @@ export default async function ProfileSettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role === "ADMIN") redirect("/admin");
+  if (!user.emailVerified) redirect("/verify-email");
   if (!user.onboardingDone) redirect("/onboarding");
 
   if (user.role === "CLIENT") {

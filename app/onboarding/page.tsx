@@ -8,6 +8,7 @@ import { AvatarInput } from "@/components/avatar-input";
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!user.emailVerified) redirect("/verify-email");
   if (user.role === "ADMIN") redirect("/admin");
   if (user.onboardingDone && user.role === "CLIENT") redirect("/dashboard");
   if (user.onboardingDone && user.role === "TALENT") redirect(`/profile/${user.id}`);

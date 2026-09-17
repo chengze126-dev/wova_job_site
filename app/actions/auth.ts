@@ -2,14 +2,18 @@
 
 import { hash, compare } from "bcryptjs";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
+import { createSession, destroySession, getCurrentUser, toSessionUser } from "@/lib/auth";
 import { COMPANY_SIZES, COUNTRIES, INDUSTRIES, parseSkills } from "@/lib/constants";
 import { savePublicUpload } from "@/lib/uploads";
 import { revalidatePath } from "next/cache";
 import { isStrongPassword } from "@/lib/password";
 import { emptyExtras, stringifyExtras } from "@/lib/profile-extras";
+import { mailConfigured, sendMail, verifyEmailContent } from "@/lib/mail";
+import { siteUrl } from "@/lib/site";
 
 const registerSchema = z.object({
   firstName: z.string().trim().min(1).max(40),
@@ -53,17 +57,13 @@ export async function registerUser(formData: FormData) {
       role: parsed.data.role,
       country: parsed.data.country,
       connects: 0,
+      emailVerified: false,
     },
   });
 
-  await createSession({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role as "CLIENT" | "TALENT",
-  });
-
-  redirect("/onboarding");
+  await createSession(toSessionUser(user));
+  await issueEmailVerification(user.id);
+  redirect("/verify-email");
 }
 
 export async function loginUser(formData: FormData) {
@@ -80,15 +80,7 @@ export async function loginUser(formData: FormData) {
   }
 
   try {
-    await createSession(
-      {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role as "ADMIN" | "CLIENT" | "TALENT",
-      },
-      { remember },
-    );
+    await createSession(toSessionUser(user), { remember });
   } catch (error) {
     if (error instanceof Error && error.message.includes("AUTH_SECRET")) {
       return { error: "Server auth is not configured. Add AUTH_SECRET in Vercel environment variables." };
@@ -96,6 +88,10 @@ export async function loginUser(formData: FormData) {
     throw error;
   }
 
+  if (!user.emailVerified && user.role !== "ADMIN") {
+    await issueEmailVerification(user.id);
+    redirect("/verify-email");
+  }
   if (!user.onboardingDone && user.role !== "ADMIN") redirect("/onboarding");
   if (user.role === "ADMIN") redirect("/admin");
   if (user.role === "TALENT") redirect("/dashboard");
@@ -275,6 +271,134 @@ export async function updateProfile(formData: FormData) {
 
 function randomOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+const VERIFY_HINT = "wova_verify_hint";
+
+function authSecret() {
+  const value = process.env.AUTH_SECRET;
+  if (!value) throw new Error("AUTH_SECRET is not set");
+  return new TextEncoder().encode(value);
+}
+
+function continueAfterAuth(user: { role: string; onboardingDone: boolean; emailVerified?: boolean }) {
+  if (!user.emailVerified && user.role !== "ADMIN") redirect("/verify-email");
+  if (!user.onboardingDone && user.role !== "ADMIN") redirect("/onboarding");
+  if (user.role === "ADMIN") redirect("/admin");
+  if (user.role === "TALENT") redirect("/dashboard");
+  redirect("/");
+}
+
+async function issueEmailVerification(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { error: "Sign in first." };
+  if (user.emailVerified) return { error: "This email is already verified." };
+
+  const code = randomOtp();
+  const token = await new SignJWT({ purpose: "email-verify", id: user.id, email: user.email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("24h")
+    .sign(authSecret());
+  const verifyUrl = `${siteUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailOtpHash: await hash(code, 10),
+      emailOtpExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const content = verifyEmailContent({ name: user.name.split(" ")[0] || user.name, code, verifyUrl });
+  const sent = await sendMail({ to: user.email, ...content });
+  const jar = await cookies();
+  if (sent.ok) {
+    jar.delete(VERIFY_HINT);
+    return { ok: true as const, sent: true };
+  }
+  jar.set(VERIFY_HINT, code, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60,
+  });
+  return { ok: true as const, sent: false, demoCode: code };
+}
+
+export async function sendEmailVerification() {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." };
+  return issueEmailVerification(user.id);
+}
+
+export async function peekEmailVerifyHint() {
+  const user = await getCurrentUser();
+  const code = (await cookies()).get(VERIFY_HINT)?.value || null;
+  return {
+    email: user?.email || "",
+    mailReady: mailConfigured(),
+    demoCode: code,
+    verified: Boolean(user?.emailVerified),
+  };
+}
+
+export async function verifyEmailCode(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." };
+  if (user.emailVerified) continueAfterAuth(user);
+
+  const code = String(formData.get("code") || "").replace(/\D/g, "");
+  if (code.length !== 6) return { error: "Enter the 6-digit code." };
+  if (!user.emailOtpHash || !user.emailOtpExpires) {
+    return { error: "Send a verification email first." };
+  }
+  if (user.emailOtpExpires.getTime() < Date.now()) {
+    return { error: "That code expired. Send a new email." };
+  }
+  if (!(await compare(code, user.emailOtpHash))) {
+    return { error: "That code is incorrect." };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: true,
+      emailOtpHash: null,
+      emailOtpExpires: null,
+    },
+  });
+  (await cookies()).delete(VERIFY_HINT);
+  await createSession(toSessionUser({ ...user, emailVerified: true }));
+  continueAfterAuth({ ...user, emailVerified: true });
+}
+
+export async function consumeEmailVerifyToken(token: string) {
+  try {
+    const { payload } = await jwtVerify(token, authSecret());
+    if (payload.purpose !== "email-verify" || !payload.id) {
+      return { error: "That link is invalid." };
+    }
+    const user = await prisma.user.findUnique({ where: { id: String(payload.id) } });
+    if (!user || user.email !== String(payload.email || "")) {
+      return { error: "That link is invalid." };
+    }
+    if (!user.emailVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+          emailOtpHash: null,
+          emailOtpExpires: null,
+        },
+      });
+    }
+    (await cookies()).delete(VERIFY_HINT);
+    await createSession(toSessionUser({ ...user, emailVerified: true }));
+    continueAfterAuth({ ...user, emailVerified: true });
+  } catch {
+    return { error: "That link expired. Send a new verification email." };
+  }
 }
 
 export async function sendPhoneOtp() {

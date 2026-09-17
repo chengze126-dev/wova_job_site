@@ -7,13 +7,13 @@ export function TalentLogo({
 }) {
   return (
     <img
-      src="/talent-badge.png"
+      src="/talent-badge.png?v=mark"
       alt="Talent badge"
       title="Passed the skill test"
       width={size}
       height={size}
-      className={`inline-block shrink-0 object-contain ${className}`}
-      style={{ width: size, height: size }}
+      className={`inline-block shrink-0 bg-transparent object-contain ${className}`}
+      style={{ width: size, height: size, background: "transparent" }}
     />
   );
 }

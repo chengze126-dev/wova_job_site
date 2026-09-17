@@ -51,6 +51,9 @@ export async function proxy(req: NextRequest) {
     if (pathname.startsWith("/admin") && payload.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
+    if (payload.emailVerified === false && pathname !== "/verify-email") {
+      return NextResponse.redirect(new URL("/verify-email", req.url));
+    }
     return NextResponse.next();
   } catch {
     return NextResponse.redirect(login);

@@ -39,7 +39,7 @@ const columns = [
   {
     title: "Company",
     links: [
-      { href: "/", label: "About us" },
+      { href: "/about", label: "About us" },
       { href: "/#resources", label: "Contact us" },
       { href: "/#why-workora", label: "Trust, safety & security" },
       { href: "/signup", label: "Careers" },

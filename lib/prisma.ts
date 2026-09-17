@@ -115,6 +115,9 @@ function migrate(instance: DatabaseSync) {
       phoneVerified INTEGER NOT NULL DEFAULT 0,
       phoneOtpHash TEXT,
       phoneOtpExpires TEXT,
+      emailVerified INTEGER NOT NULL DEFAULT 0,
+      emailOtpHash TEXT,
+      emailOtpExpires TEXT,
       bio TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
@@ -254,12 +257,26 @@ function migrate(instance: DatabaseSync) {
   } catch {
     // column already exists
   }
-  for (const column of ["avatarUrl TEXT", "title TEXT", "hourlyRate INTEGER", "skills TEXT", "extras TEXT"]) {
+  for (const column of [
+    "avatarUrl TEXT",
+    "title TEXT",
+    "hourlyRate INTEGER",
+    "skills TEXT",
+    "extras TEXT",
+    "emailVerified INTEGER NOT NULL DEFAULT 0",
+    "emailOtpHash TEXT",
+    "emailOtpExpires TEXT",
+  ]) {
     try {
       instance.exec(`ALTER TABLE User ADD COLUMN ${column}`);
     } catch {
       // column already exists
     }
+  }
+  try {
+    instance.exec("UPDATE User SET emailVerified = 1 WHERE onboardingDone = 1");
+  } catch {
+    // column missing on a brand-new empty file
   }
   instance
     .prepare(
@@ -332,6 +349,9 @@ export type User = {
   phoneVerified: boolean;
   phoneOtpHash: string | null;
   phoneOtpExpires: Date | null;
+  emailVerified: boolean;
+  emailOtpHash: string | null;
+  emailOtpExpires: Date | null;
   bio: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -367,6 +387,9 @@ function mapUser(row: Dict): User {
     phoneVerified: asBool(row.phoneVerified),
     phoneOtpHash: (row.phoneOtpHash as string) ?? null,
     phoneOtpExpires: toDate(row.phoneOtpExpires),
+    emailVerified: asBool(row.emailVerified),
+    emailOtpHash: (row.emailOtpHash as string) ?? null,
+    emailOtpExpires: toDate(row.emailOtpExpires),
     bio: (row.bio as string) ?? null,
     createdAt: new Date(String(row.createdAt)),
     updatedAt: new Date(String(row.updatedAt)),
@@ -498,10 +521,10 @@ export const prisma = {
       db()
         .prepare(
           `INSERT INTO User (
-            id, email, passwordHash, role, name, country, phone, phoneVerified, bio, createdAt, updatedAt,
+            id, email, passwordHash, role, name, country, phone, phoneVerified, emailVerified, bio, createdAt, updatedAt,
             linkedinUrl, resumeUrl, avatarUrl, title, hourlyRate, skills, extras, skillTestPassed, talentBadge, connects, onboardingDone,
             companyName, companySize, companyIndustry, companyWebsite, companyLocation, paymentConnected
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           userId,
@@ -512,6 +535,7 @@ export const prisma = {
           data.country ?? null,
           data.phone ?? null,
           toBool(data.phoneVerified),
+          data.emailVerified === undefined ? toBool(data.onboardingDone) : toBool(data.emailVerified),
           data.bio ?? null,
           createdAt,
           createdAt,
@@ -542,18 +566,21 @@ export const prisma = {
         ...current,
         ...data,
         phoneVerified: data.phoneVerified === undefined ? current.phoneVerified : Boolean(data.phoneVerified),
+        emailVerified: data.emailVerified === undefined ? current.emailVerified : Boolean(data.emailVerified),
         skillTestPassed: data.skillTestPassed === undefined ? current.skillTestPassed : Boolean(data.skillTestPassed),
         talentBadge: data.talentBadge === undefined ? current.talentBadge : Boolean(data.talentBadge),
         onboardingDone: data.onboardingDone === undefined ? current.onboardingDone : Boolean(data.onboardingDone),
         paymentConnected: data.paymentConnected === undefined ? current.paymentConnected : Boolean(data.paymentConnected),
         connects: data.connects === undefined ? current.connects : applyIncrement(current.connects, data.connects),
         phoneOtpExpires: data.phoneOtpExpires === undefined ? current.phoneOtpExpires : data.phoneOtpExpires,
+        emailOtpExpires: data.emailOtpExpires === undefined ? current.emailOtpExpires : data.emailOtpExpires,
         updatedAt: new Date(),
       };
       db()
         .prepare(
           `UPDATE User SET
-            name=?, country=?, phone=?, phoneVerified=?, phoneOtpHash=?, phoneOtpExpires=?, bio=?, updatedAt=?,
+            name=?, country=?, phone=?, phoneVerified=?, phoneOtpHash=?, phoneOtpExpires=?,
+            emailVerified=?, emailOtpHash=?, emailOtpExpires=?, bio=?, updatedAt=?,
             linkedinUrl=?, resumeUrl=?, avatarUrl=?, title=?, hourlyRate=?, skills=?, extras=?, skillTestPassed=?, talentBadge=?, connects=?, onboardingDone=?,
             companyName=?, companySize=?, companyIndustry=?, companyWebsite=?, companyLocation=?,
             stripeCustomerId=?, paymentConnected=?
@@ -566,6 +593,9 @@ export const prisma = {
           toBool(next.phoneVerified),
           next.phoneOtpHash,
           next.phoneOtpExpires ? new Date(next.phoneOtpExpires as Date).toISOString() : null,
+          toBool(next.emailVerified),
+          next.emailOtpHash,
+          next.emailOtpExpires ? new Date(next.emailOtpExpires as Date).toISOString() : null,
           next.bio,
           next.updatedAt.toISOString(),
           next.linkedinUrl,

@@ -6,15 +6,19 @@ export function TalentLogo({
   className?: string;
 }) {
   return (
-    <img
-      src="/talent-badge.png?v=mark"
-      alt="Talent badge"
+    <span
+      className={`inline-flex shrink-0 overflow-hidden rounded-full ${className}`}
+      style={{ width: size, height: size }}
       title="Passed the skill test"
-      width={size}
-      height={size}
-      className={`inline-block shrink-0 bg-transparent object-contain ${className}`}
-      style={{ width: size, height: size, background: "transparent" }}
-    />
+    >
+      <img
+        src="/talent-badge.png?v=seal"
+        alt="Talent badge"
+        width={size}
+        height={size}
+        className="h-full w-full object-cover"
+      />
+    </span>
   );
 }
 

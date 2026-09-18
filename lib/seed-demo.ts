@@ -4,6 +4,7 @@ import { extraClients, marketplaceJobs } from "../prisma/marketplace-data";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
 import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
+import { ADMIN_EMAIL, ADMIN_ID, ADMIN_NAME, adminPassword } from "./admin";
 
 const questions = [
   {
@@ -129,17 +130,18 @@ export async function seedDemoData() {
   await prisma.user.deleteMany();
 
   const password = await hash("Hireline123!", 10);
-  const adminPassword = await hash("AdminHireline!2026", 10);
+  const adminPasswordHash = await hash(adminPassword(), 10);
 
   await prisma.user.create({
     data: {
-      id: "wova-user-admin",
-      email: "admin@hireline.local",
-      passwordHash: adminPassword,
+      id: ADMIN_ID,
+      email: ADMIN_EMAIL,
+      passwordHash: adminPasswordHash,
       role: "ADMIN",
-      name: "Hireline Admin",
+      name: ADMIN_NAME,
       onboardingDone: true,
       phoneVerified: true,
+      emailVerified: true,
     },
   });
 

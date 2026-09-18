@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { formatCodeCall, parseStoredAnswers, reviewSkillAttempt } from "@/lib/skill-review";
 import { TalentBadge } from "@/components/badges";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function AdminSkillTestResultPage({
   params,
@@ -13,7 +14,7 @@ export default async function AdminSkillTestResultPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "ADMIN") redirect("/dashboard");
+  if (user.role !== "ADMIN" || !isAdminEmail(user.email)) redirect("/dashboard");
 
   const { id } = await params;
   const attempt = await prisma.skillAttempt.findUnique({ where: { id } });

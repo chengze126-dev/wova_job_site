@@ -5,6 +5,8 @@ import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
+import { ADMIN_EMAIL, ADMIN_ID, ADMIN_NAME, adminPassword } from "./admin";
+import { hashSync } from "bcryptjs";
 import { marketplaceJobs } from "../prisma/marketplace-data";
 
 type Dict = Record<string, unknown>;
@@ -331,6 +333,31 @@ function migrate(instance: DatabaseSync) {
     extrasFill.run(stringifyExtras(extras), email);
   }
   ensureCodingQuestions(instance);
+  ensureAdminUser(instance);
+}
+
+function ensureAdminUser(instance: DatabaseSync) {
+  const passwordHash = hashSync(adminPassword(), 10);
+  const createdAt = now();
+  instance.prepare("DELETE FROM User WHERE role = 'ADMIN' AND lower(email) != ?").run(ADMIN_EMAIL);
+  const existing = instance.prepare("SELECT id FROM User WHERE lower(email) = ?").get(ADMIN_EMAIL) as
+    | { id: string }
+    | undefined;
+  if (existing) {
+    instance
+      .prepare(
+        `UPDATE User SET passwordHash=?, role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`,
+      )
+      .run(passwordHash, ADMIN_NAME, createdAt, existing.id);
+    return;
+  }
+  instance
+    .prepare(
+      `INSERT INTO User (
+        id, email, passwordHash, role, name, phoneVerified, emailVerified, onboardingDone, createdAt, updatedAt, connects
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    .run(ADMIN_ID, ADMIN_EMAIL, passwordHash, "ADMIN", ADMIN_NAME, 1, 1, 1, createdAt, createdAt, 0);
 }
 
 function now() {

@@ -4,7 +4,7 @@ import { seedDemoData } from "../lib/seed-demo";
 async function main() {
   await seedDemoData();
   console.log("Seeded Wova.");
-  console.log("Admin:  admin@hireline.local / AdminHireline!2026");
+  console.log(`Admin:  ${process.env.ADMIN_EMAIL || "demarsgold@gmail.com"}`);
   console.log("Client: jordan@northfield.co / Hireline123!");
   console.log("Talent: maya@talent.test / Hireline123!");
 }

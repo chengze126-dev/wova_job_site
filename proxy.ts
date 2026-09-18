@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { SITE_HOST } from "@/lib/site";
+import { isAdminEmail } from "@/lib/admin";
 
 const AUTH_PREFIXES = [
   "/dashboard",
@@ -48,7 +49,7 @@ export async function proxy(req: NextRequest) {
 
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(process.env.AUTH_SECRET));
-    if (pathname.startsWith("/admin") && payload.role !== "ADMIN") {
+    if (pathname.startsWith("/admin") && (payload.role !== "ADMIN" || !isAdminEmail(String(payload.email || "")))) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     if (payload.emailVerified === false && pathname !== "/verify-email") {

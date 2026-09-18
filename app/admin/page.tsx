@@ -4,11 +4,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TalentBadge } from "@/components/badges";
 import { formatDate } from "@/lib/utils";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "ADMIN") redirect("/dashboard");
+  if (user.role !== "ADMIN" || !isAdminEmail(user.email)) redirect("/dashboard");
 
   const [clients, talents, jobs, attempts] = await Promise.all([
     prisma.user.findMany({ where: { role: "CLIENT" }, orderBy: { createdAt: "desc" } }),

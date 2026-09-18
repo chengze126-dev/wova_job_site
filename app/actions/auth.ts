@@ -14,6 +14,7 @@ import { isStrongPassword } from "@/lib/password";
 import { emptyExtras, stringifyExtras } from "@/lib/profile-extras";
 import { mailConfigured, sendMail, verifyEmailContent } from "@/lib/mail";
 import { siteUrl } from "@/lib/site";
+import { isAdminEmail } from "@/lib/admin";
 
 const registerSchema = z.object({
   firstName: z.string().trim().min(1).max(40),
@@ -46,7 +47,9 @@ export async function registerUser(formData: FormData) {
   }
 
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-  if (existing) return { error: "An account with that email already exists. Log in instead." };
+  if (existing || isAdminEmail(parsed.data.email)) {
+    return { error: "An account with that email already exists. Log in instead." };
+  }
 
   const name = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
   const user = await prisma.user.create({

@@ -26,10 +26,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Role   | Email                    | Password            |
 |--------|--------------------------|---------------------|
-| Admin  | admin@hireline.local     | AdminHireline!2026  |
 | Client | jordan@northfield.co     | Hireline123!        |
 | Talent | maya@talent.test         | Hireline123!        |
 | Talent | diego@talent.test        | Hireline123!        |
+
+Admin access is limited to the account in `ADMIN_EMAIL`.
 
 Phone verification is demo-mode: the 6-digit code is shown in the UI instead of SMS.
 

@@ -11,13 +11,23 @@ import { updateApplicationStatus } from "@/app/actions/jobs";
 import { startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 
+export const dynamic = "force-dynamic";
+
+function isNextControlFlowError(error: unknown) {
+  if (!error || typeof error !== "object" || !("digest" in error)) return false;
+  const digest = String((error as { digest?: string }).digest || "");
+  return (
+    digest.startsWith("NEXT_") ||
+    digest === "DYNAMIC_SERVER_USAGE" ||
+    digest === "BAILOUT_TO_CLIENT_SIDE_RENDERING"
+  );
+}
+
 export default async function DashboardPage() {
   try {
     return await renderDashboard();
   } catch (error) {
-    const digest =
-      typeof error === "object" && error && "digest" in error ? String((error as { digest?: string }).digest) : "";
-    if (digest.includes("NEXT_REDIRECT") || digest.includes("NEXT_NOT_FOUND")) throw error;
+    if (isNextControlFlowError(error)) throw error;
     console.error("Dashboard failed", error);
     return (
       <div className="mx-auto max-w-md px-5 py-24 text-center">

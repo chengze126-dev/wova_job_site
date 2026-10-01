@@ -8,6 +8,7 @@ import { Footer } from "@/components/footer";
 import { getSession } from "@/lib/auth";
 import { siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
+import { AdminSkillAlert } from "@/components/admin-skill-alert";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {themeInitScript}
         </Script>
         <Header user={session} />
+        {session?.role === "ADMIN" ? <AdminSkillAlert /> : null}
         <main className="flex-1">{children}</main>
         <Footer />
       </body>

@@ -7,6 +7,7 @@ import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
 import { ADMIN_EMAIL, ADMIN_ID, ADMIN_NAME, adminPassword } from "./admin";
 import { hashSync } from "bcryptjs";
+import { dataDirectory, isVercelProduction } from "./paths";
 import { marketplaceJobs } from "../prisma/marketplace-data";
 
 type Dict = Record<string, unknown>;
@@ -18,10 +19,7 @@ const globalForDb = globalThis as unknown as {
 };
 
 function dataDir() {
-  if (process.env.WOVA_DATA_DIR) return process.env.WOVA_DATA_DIR;
-  // Vercel’s serverless filesystem is read-only except /tmp.
-  if (process.env.VERCEL) return "/tmp/wova-data";
-  return path.join(process.cwd(), "data");
+  return dataDirectory();
 }
 
 function demoDbPath() {
@@ -41,16 +39,24 @@ function userCount(instance: DatabaseSync) {
 }
 
 function db() {
-  if (globalForDb.hirelineDb) return globalForDb.hirelineDb;
+  if (globalForDb.hirelineDb) {
+    ensureSkillAttemptLiveColumns(globalForDb.hirelineDb);
+    return globalForDb.hirelineDb;
+  }
   const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, "hireline.db");
   const seedFile = demoDbPath();
-  if (!fs.existsSync(dest) && fs.existsSync(seedFile)) {
+  if (!isVercelProduction() && !fs.existsSync(dest) && fs.existsSync(seedFile)) {
     fs.copyFileSync(seedFile, dest);
   }
   let instance = openSqlite(dest);
-  if (userCount(instance) === 0 && fs.existsSync(seedFile) && path.resolve(seedFile) !== path.resolve(dest)) {
+  if (
+    !isVercelProduction() &&
+    userCount(instance) === 0 &&
+    fs.existsSync(seedFile) &&
+    path.resolve(seedFile) !== path.resolve(dest)
+  ) {
     instance.close();
     fs.copyFileSync(seedFile, dest);
     instance = openSqlite(dest);
@@ -61,6 +67,10 @@ function db() {
 
 async function ensureDemoSeed() {
   if (globalForDb.hirelineSeeded) return;
+  if (isVercelProduction()) {
+    globalForDb.hirelineSeeded = true;
+    return;
+  }
   if (userCount(db()) > 0) {
     globalForDb.hirelineSeeded = true;
     return;
@@ -214,6 +224,11 @@ function migrate(instance: DatabaseSync) {
       score INTEGER,
       passed INTEGER NOT NULL DEFAULT 0,
       cameraEnabled INTEGER NOT NULL DEFAULT 0,
+      cameraOn INTEGER NOT NULL DEFAULT 0,
+      lastHeartbeat TEXT,
+      cameraFrame TEXT,
+      questionIndex INTEGER NOT NULL DEFAULT 0,
+      stackName TEXT,
       answers TEXT,
       FOREIGN KEY (talentId) REFERENCES User(id) ON DELETE CASCADE
     );
@@ -274,6 +289,7 @@ function migrate(instance: DatabaseSync) {
   } catch {
     // column already exists
   }
+  ensureSkillAttemptLiveColumns(instance);
   for (const column of [
     "avatarUrl TEXT",
     "title TEXT",
@@ -336,13 +352,38 @@ function migrate(instance: DatabaseSync) {
   ensureAdminUser(instance);
 }
 
+function ensureSkillAttemptLiveColumns(instance: DatabaseSync) {
+  for (const column of [
+    "cameraOn INTEGER NOT NULL DEFAULT 0",
+    "lastHeartbeat TEXT",
+    "cameraFrame TEXT",
+    "questionIndex INTEGER NOT NULL DEFAULT 0",
+    "stackName TEXT",
+  ]) {
+    try {
+      instance.exec(`ALTER TABLE SkillAttempt ADD COLUMN ${column}`);
+    } catch {
+      // column already exists
+    }
+  }
+}
+
 function ensureAdminUser(instance: DatabaseSync) {
-  const passwordHash = hashSync(adminPassword(), 10);
   const createdAt = now();
   instance.prepare("DELETE FROM User WHERE role = 'ADMIN' AND lower(email) != ?").run(ADMIN_EMAIL);
+  const password = adminPassword();
   const existing = instance.prepare("SELECT id FROM User WHERE lower(email) = ?").get(ADMIN_EMAIL) as
     | { id: string }
     | undefined;
+  if (!password) {
+    if (existing) {
+      instance
+        .prepare(`UPDATE User SET role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`)
+        .run(ADMIN_NAME, createdAt, existing.id);
+    }
+    return;
+  }
+  const passwordHash = hashSync(password, 10);
   if (existing) {
     instance
       .prepare(
@@ -358,6 +399,24 @@ function ensureAdminUser(instance: DatabaseSync) {
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(ADMIN_ID, ADMIN_EMAIL, passwordHash, "ADMIN", ADMIN_NAME, 1, 1, 1, createdAt, createdAt, 0);
+}
+
+function mapSkillAttempt(row: Dict) {
+  return {
+    id: String(row.id),
+    talentId: String(row.talentId),
+    startedAt: new Date(String(row.startedAt)),
+    completedAt: toDate(row.completedAt),
+    score: row.score == null ? null : Number(row.score),
+    passed: asBool(row.passed),
+    cameraEnabled: asBool(row.cameraEnabled),
+    cameraOn: asBool(row.cameraOn),
+    lastHeartbeat: toDate(row.lastHeartbeat),
+    cameraFrame: (row.cameraFrame as string) ?? null,
+    questionIndex: row.questionIndex == null ? 0 : Number(row.questionIndex),
+    stackName: (row.stackName as string) ?? null,
+    answers: (row.answers as string) ?? null,
+  };
 }
 
 function now() {
@@ -1047,31 +1106,21 @@ export const prisma = {
     async findUnique({ where }: { where: { id: string } }) {
       const row = db().prepare("SELECT * FROM SkillAttempt WHERE id = ?").get(where.id) as Dict | undefined;
       if (!row) return null;
-      return {
-        id: String(row.id),
-        talentId: String(row.talentId),
-        startedAt: new Date(String(row.startedAt)),
-        completedAt: toDate(row.completedAt),
-        score: row.score == null ? null : Number(row.score),
-        passed: asBool(row.passed),
-        cameraEnabled: asBool(row.cameraEnabled),
-        answers: (row.answers as string) ?? null,
-      };
+      return mapSkillAttempt(row);
     },
-    async findMany({ include, orderBy, take }: { include?: Dict; orderBy?: Dict; take?: number } = {}) {
+    async findMany({ include, orderBy, take, where }: { include?: Dict; orderBy?: Dict; take?: number; where?: Dict } = {}) {
       void orderBy;
+      const liveOnly = Boolean(where?.completedAt === null);
       const rows = db()
-        .prepare(`SELECT * FROM SkillAttempt ORDER BY startedAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`)
+        .prepare(
+          `SELECT ${liveOnly ? "*" : "id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, questionIndex, stackName, answers"}
+           FROM SkillAttempt
+           ${liveOnly ? "WHERE completedAt IS NULL" : ""}
+           ORDER BY startedAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`,
+        )
         .all() as Dict[];
       return rows.map((row) => ({
-        id: String(row.id),
-        talentId: String(row.talentId),
-        startedAt: new Date(String(row.startedAt)),
-        completedAt: toDate(row.completedAt),
-        score: row.score == null ? null : Number(row.score),
-        passed: asBool(row.passed),
-        cameraEnabled: asBool(row.cameraEnabled),
-        answers: (row.answers as string) ?? null,
+        ...mapSkillAttempt(row),
         talent: include?.talent ? getUserById(String(row.talentId)) : undefined,
       }));
     },
@@ -1079,8 +1128,8 @@ export const prisma = {
       const attemptId = id();
       db()
         .prepare(
-          `INSERT INTO SkillAttempt (id, talentId, startedAt, completedAt, score, passed, cameraEnabled, answers)
-           VALUES (?,?,?,?,?,?,?,?)`,
+          `INSERT INTO SkillAttempt (id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, cameraFrame, questionIndex, stackName, answers)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           attemptId,
@@ -1090,19 +1139,49 @@ export const prisma = {
           data.score ?? null,
           toBool(data.passed),
           toBool(data.cameraEnabled),
+          toBool(data.cameraOn),
+          data.lastHeartbeat ? new Date(data.lastHeartbeat as Date).toISOString() : null,
+          data.cameraFrame ?? null,
+          data.questionIndex ?? 0,
+          data.stackName ?? null,
           data.answers ?? null,
         );
       return this.findUnique({ where: { id: attemptId } });
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
+      const current = await this.findUnique({ where });
+      if (!current) return null;
+      const completedAt =
+        data.completedAt === undefined
+          ? current.completedAt
+            ? current.completedAt.toISOString()
+            : null
+          : data.completedAt
+            ? new Date(data.completedAt as Date).toISOString()
+            : null;
+      const lastHeartbeat =
+        data.lastHeartbeat === undefined
+          ? current.lastHeartbeat
+            ? current.lastHeartbeat.toISOString()
+            : null
+          : data.lastHeartbeat
+            ? new Date(data.lastHeartbeat as Date).toISOString()
+            : null;
       db()
-        .prepare("UPDATE SkillAttempt SET completedAt=?, score=?, passed=?, cameraEnabled=?, answers=? WHERE id=?")
+        .prepare(
+          `UPDATE SkillAttempt SET completedAt=?, score=?, passed=?, cameraEnabled=?, cameraOn=?, lastHeartbeat=?, cameraFrame=?, questionIndex=?, stackName=?, answers=? WHERE id=?`,
+        )
         .run(
-          data.completedAt ? new Date(data.completedAt as Date).toISOString() : null,
-          data.score ?? null,
-          toBool(data.passed),
-          toBool(data.cameraEnabled),
-          data.answers ?? null,
+          completedAt,
+          data.score === undefined ? current.score : data.score,
+          data.passed === undefined ? toBool(current.passed) : toBool(data.passed),
+          data.cameraEnabled === undefined ? toBool(current.cameraEnabled) : toBool(data.cameraEnabled),
+          data.cameraOn === undefined ? toBool(current.cameraOn) : toBool(data.cameraOn),
+          lastHeartbeat,
+          data.cameraFrame === undefined ? current.cameraFrame : data.cameraFrame,
+          data.questionIndex === undefined ? current.questionIndex : data.questionIndex,
+          data.stackName === undefined ? current.stackName : data.stackName,
+          data.answers === undefined ? current.answers : data.answers,
           where.id,
         );
       return this.findUnique({ where });

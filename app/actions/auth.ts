@@ -12,9 +12,10 @@ import { savePublicUpload } from "@/lib/uploads";
 import { revalidatePath } from "next/cache";
 import { isStrongPassword } from "@/lib/password";
 import { emptyExtras, stringifyExtras } from "@/lib/profile-extras";
-import { mailConfigured, sendMail, verifyEmailContent } from "@/lib/mail";
+import { mailConfigured, sendMail, verifyEmailContent, resetPasswordContent } from "@/lib/mail";
 import { siteUrl } from "@/lib/site";
 import { isAdminEmail } from "@/lib/admin";
+import { isVercelProduction } from "@/lib/paths";
 
 const registerSchema = z.object({
   firstName: z.string().trim().min(1).max(40),
@@ -107,11 +108,67 @@ export async function requestPasswordReset(formData: FormData) {
     .toLowerCase();
   if (!email.includes("@")) return { error: "Enter the email address for your account." };
 
-  await prisma.user.findUnique({ where: { email } });
-  return {
-    ok: true,
+  const generic = {
+    ok: true as const,
     message: "If an account exists for that email, we sent a reset link. Check your inbox.",
   };
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return generic;
+
+  const token = await new SignJWT({ purpose: "password-reset", id: user.id, email: user.email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("1h")
+    .sign(authSecret());
+  const resetUrl = `${siteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+
+  if (!mailConfigured()) {
+    if (isVercelProduction()) {
+      return { error: "Password reset email is not configured. Set RESEND_API_KEY." };
+    }
+    return {
+      ok: true as const,
+      message: `Email sending is not configured yet. Open this reset link: ${resetUrl}`,
+    };
+  }
+
+  const content = resetPasswordContent({ name: user.name.split(" ")[0] || user.name, resetUrl });
+  const sent = await sendMail({ to: user.email, ...content });
+  if (!sent.ok) {
+    if (isVercelProduction()) return { error: "Could not send the reset email. Try again." };
+    return {
+      ok: true as const,
+      message: `Email sending failed. Open this reset link: ${resetUrl}`,
+    };
+  }
+  return generic;
+}
+
+export async function resetPassword(formData: FormData) {
+  const token = String(formData.get("token") || "").trim();
+  const password = String(formData.get("password") || "");
+  if (!token) return { error: "That reset link is missing. Request a new one." };
+  if (!isStrongPassword(password)) {
+    return { error: "Password must be 8+ characters and include a letter, a number, and a special character." };
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, authSecret());
+    if (payload.purpose !== "password-reset" || !payload.id) {
+      return { error: "That link is invalid. Request a new reset email." };
+    }
+    const user = await prisma.user.findUnique({ where: { id: String(payload.id) } });
+    if (!user || user.email !== String(payload.email || "")) {
+      return { error: "That link is invalid. Request a new reset email." };
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hash(password, 10) },
+    });
+    return { ok: true as const };
+  } catch {
+    return { error: "That link expired. Request a new reset email." };
+  }
 }
 
 export async function logoutUser() {
@@ -319,6 +376,14 @@ async function issueEmailVerification(userId: string) {
     jar.delete(VERIFY_HINT);
     return { ok: true as const, sent: true };
   }
+  if (isVercelProduction()) {
+    return {
+      error:
+        sent.error === "not_configured"
+          ? "Email sending is not configured. Set RESEND_API_KEY."
+          : "Could not send the verification email. Try again.",
+    };
+  }
   jar.set(VERIFY_HINT, code, {
     httpOnly: true,
     sameSite: "lax",
@@ -422,6 +487,10 @@ export async function sendPhoneOtp() {
       phoneOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
     },
   });
+
+  if (isVercelProduction()) {
+    return { error: "Phone verification is not configured." };
+  }
 
   return { message: `Demo code: ${code}` };
 }

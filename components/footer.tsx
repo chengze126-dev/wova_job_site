@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const AUTH_PATHS = new Set(["/login", "/signup", "/forgot-password"]);
+const AUTH_PATHS = new Set(["/login", "/signup", "/forgot-password", "/reset-password"]);
 
 const columns = [
   {
@@ -21,7 +21,7 @@ const columns = [
     links: [
       { href: "/signup?role=TALENT", label: "Create a profile" },
       { href: "/jobs", label: "Find freelance jobs" },
-      { href: "/skill-test", label: "Optional skill test" },
+      { href: "/skill-test", label: "Skill test" },
       { href: "/connects", label: "Buy connects" },
       { href: "/#how-it-works", label: "How to find work" },
     ],
@@ -75,8 +75,8 @@ export function Footer() {
         <div className="mt-[42px] flex flex-col gap-3 border-t border-line pt-[18px] text-[12px] text-footer-fg/55 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Wova</p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/" className="hover:text-footer-fg">Terms of Service</Link>
-            <Link href="/" className="hover:text-footer-fg">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-footer-fg">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-footer-fg">Privacy Policy</Link>
             <Link href="/" className="hover:text-footer-fg">Accessibility</Link>
             <Link href="/" className="hover:text-footer-fg">Sitemap</Link>
           </div>

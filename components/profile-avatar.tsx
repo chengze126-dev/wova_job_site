@@ -38,6 +38,8 @@ export function ProfileAvatar({
             width={size}
             height={size}
             className="h-full w-full object-cover"
+            style={{ color: "transparent", filter: "blur(0px)" }}
+            suppressHydrationWarning
           />
         ) : (
           <span className="flex h-full w-full items-center justify-center">{letters}</span>

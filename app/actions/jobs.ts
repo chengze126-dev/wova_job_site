@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import path from "path";
-import { mkdir, writeFile } from "fs/promises";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { savePublicUpload } from "@/lib/uploads";
 import {
   clientReady,
   HIGH_BADGE_CONNECT_COSTS,
@@ -88,17 +87,15 @@ export async function applyToJob(jobId: string, formData: FormData) {
   let attachmentUrl: string | null = null;
   let attachmentName: string | null = null;
   if (file instanceof File && file.size > 0) {
-    if (file.size > 8 * 1024 * 1024) return { error: "Attachment must be under 8MB." };
-    const ext = path.extname(file.name).toLowerCase() || "";
-    const allowed = [".pdf", ".doc", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".zip"];
-    if (!allowed.includes(ext)) {
-      return { error: "Upload a PDF, DOC, image, or ZIP — or submit without a file." };
-    }
-    const dir = path.join(process.cwd(), "public", "uploads", "proposals");
-    await mkdir(dir, { recursive: true });
-    const filename = `${user.id}-${Date.now()}${ext}`;
-    await writeFile(path.join(dir, filename), Buffer.from(await file.arrayBuffer()));
-    attachmentUrl = `/uploads/proposals/${filename}`;
+    const saved = await savePublicUpload({
+      file,
+      folder: "proposals",
+      userId: user.id,
+      allowed: [".pdf", ".doc", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".zip"],
+      maxBytes: 8 * 1024 * 1024,
+    });
+    if ("error" in saved) return { error: saved.error };
+    attachmentUrl = saved.url;
     attachmentName = file.name.slice(0, 120);
   }
 

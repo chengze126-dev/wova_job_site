@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { TalentBadge } from "@/components/badges";
 import { formatDate } from "@/lib/utils";
 import { isAdminEmail } from "@/lib/admin";
+import { AdminLiveSkillMonitor } from "@/components/admin-live-skill-monitor";
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
@@ -26,6 +27,8 @@ export default async function AdminPage() {
         Full view of clients, talents, jobs, and skill tests. {clients.length} clients · {talents.length}{" "}
         talents · {jobs.length} jobs.
       </p>
+
+      <AdminLiveSkillMonitor />
 
       <section className="mt-10">
         <h2 className="font-display text-3xl">Clients</h2>
@@ -146,7 +149,15 @@ export default async function AdminPage() {
                     <td className="p-3">
                       {a.completedAt ? (a.passed ? "Pass" : "Fail") : "In progress"}
                     </td>
-                    <td className="p-3">{a.cameraEnabled ? "On" : "Off"}</td>
+                    <td className="p-3">
+                      {a.completedAt
+                        ? a.cameraEnabled
+                          ? "On"
+                          : "Off"
+                        : a.cameraOn
+                          ? "On"
+                          : "Off"}
+                    </td>
                     <td className="p-3">{formatDate(a.startedAt)}</td>
                     <td className="p-3 text-right">
                       <Link href={`/admin/skill-tests/${a.id}`} className="font-medium text-pine hover:underline">

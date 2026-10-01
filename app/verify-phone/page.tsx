@@ -27,7 +27,8 @@ export default function VerifyPhonePage() {
       <p className="text-xs uppercase tracking-[0.24em] text-pine">Phone verify</p>
       <h1 className="font-display mt-2 text-4xl">Confirm your number</h1>
       <p className="mt-3 text-sm leading-6 text-muted">
-        Confirm the number on your profile. In this demo, the code is shown on screen instead of SMS.
+        Confirm the number on your profile. If SMS is not configured on this machine, the code is shown on
+        screen.
       </p>
       <div className="mt-8 space-y-4 rounded-2xl border border-line bg-cream p-6">
         <button

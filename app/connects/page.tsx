@@ -45,7 +45,7 @@ export default async function ConnectsPage({
         <p className="mt-2 text-sm text-muted">
           {stripeEnabled()
             ? "Paid with Stripe Checkout."
-            : "Stripe keys are not set, so this demo credits the pack immediately."}
+            : "Stripe is not configured on this machine, so this local pack is credited immediately. Production requires STRIPE_SECRET_KEY."}
         </p>
         <form action={buyConnects} className="mt-5">
           <SubmitButton>Buy {CONNECT_PACK.connects} connects</SubmitButton>

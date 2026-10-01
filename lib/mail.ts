@@ -92,6 +92,42 @@ ${origin}
   return { subject: "Verify your Wova email", html, text };
 }
 
+export function resetPasswordContent({ name, resetUrl }: { name: string; resetUrl: string }) {
+  const origin = siteUrl();
+  const text = `Hi ${name},
+
+Reset your Wova password with this link:
+${resetUrl}
+
+This link expires in 1 hour. If you did not ask to reset your password, ignore this email.
+
+${origin}
+`;
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f7f4;font-family:Arial,sans-serif;color:#111;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;padding:32px;border:1px solid #e6e8e3;">
+            <tr><td style="font-size:13px;font-weight:700;letter-spacing:0.16em;color:#0db64b;text-transform:uppercase;">Wova</td></tr>
+            <tr><td style="padding-top:12px;font-size:24px;font-weight:700;">Reset your password</td></tr>
+            <tr><td style="padding-top:12px;font-size:15px;line-height:1.6;color:#444;">Hi ${escapeHtml(name)}, use this button to choose a new password. The link expires in 1 hour.</td></tr>
+            <tr><td style="padding-top:24px;">
+              <a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#0db64b;color:#fff;text-decoration:none;font-weight:700;border-radius:999px;padding:12px 22px;">Choose a new password</a>
+            </td></tr>
+            <tr><td style="padding-top:20px;font-size:13px;line-height:1.6;color:#666;">If you did not ask to reset your password, ignore this email.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { subject: "Reset your Wova password", html, text };
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")

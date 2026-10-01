@@ -31,7 +31,7 @@ export default async function BillingPage({
         <p className="text-sm leading-6 text-muted">
           {stripeEnabled()
             ? "Stripe Setup Checkout will collect a card for your company."
-            : "Stripe keys are not set. Demo mode marks payment as connected so you can keep posting jobs."}
+            : "Stripe is not configured on this machine, so this local demo marks payment as connected. Production requires STRIPE_SECRET_KEY."}
         </p>
         <form action={connectClientPayment} className="mt-5">
           <SubmitButton>{user.paymentConnected ? "Update payment" : "Connect payment"}</SubmitButton>

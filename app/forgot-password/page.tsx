@@ -20,11 +20,11 @@ export default function ForgotPasswordPage() {
         Enter the email on your Wova account. If it exists, we’ll send reset instructions.
       </p>
 
-      {state?.ok ? (
+      {state && "ok" in state && state.ok ? (
         <p className="mt-6 rounded-[8px] bg-brand/10 px-4 py-3 text-[13px] text-pine">{state.message}</p>
       ) : (
         <form action={action} className="mt-6 space-y-3.5">
-          <AuthError message={state?.error} />
+          <AuthError message={state && "error" in state ? state.error : undefined} />
           <AuthField label="Email">
             <input name="email" type="email" required autoComplete="email" className={authInputClass} />
           </AuthField>

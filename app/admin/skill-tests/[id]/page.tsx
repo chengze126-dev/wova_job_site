@@ -52,8 +52,22 @@ export default async function AdminSkillTestResultPage({
         </p>
         <p>
           <span className="text-muted">Camera</span>
-          <span className="mt-1 block">{attempt.cameraEnabled ? "On" : "Off"}</span>
+          <span className="mt-1 block">
+            {attempt.completedAt
+              ? attempt.cameraEnabled
+                ? "On during test"
+                : "Off"
+              : attempt.cameraOn
+                ? "On now"
+                : "Off"}
+          </span>
         </p>
+        {attempt.stackName ? (
+          <p>
+            <span className="text-muted">Stack</span>
+            <span className="mt-1 block">{attempt.stackName}</span>
+          </p>
+        ) : null}
         <p>
           <span className="text-muted">Started</span>
           <span className="mt-1 block">{formatDate(attempt.startedAt)}</span>

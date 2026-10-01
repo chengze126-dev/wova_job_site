@@ -10,6 +10,7 @@ const referenceBrands = ["Google", "Microsoft", "Amazon", "Stripe", "Notion", "H
 
 export default async function HomePage() {
   const session = await getSession();
+  const openJobCount = await prisma.job.count({ where: { status: "OPEN" } });
   const jobs = await prisma.job.findMany({
     where: { status: "OPEN" },
     include: { client: true, _count: { select: { applications: true } } },
@@ -19,7 +20,7 @@ export default async function HomePage() {
 
   return (
     <div className="bg-paper" data-home>
-      <HomeHero user={session} />
+      <HomeHero user={session} openJobCount={openJobCount} />
 
       <section id="companies" className="mx-auto w-[92%] max-w-[1308px] pb-[22px] pt-[24px]">
         <div className="flex items-center justify-between gap-3">

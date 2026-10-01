@@ -111,7 +111,15 @@ export default function SignupForm() {
         <label className="flex items-start gap-2.5 text-[12px] leading-5 text-[#475569]">
           <input type="checkbox" name="agree" required className="mt-0.5 h-4 w-4 accent-[#0db64b]" />
           <span>
-            I agree to Wova’s Terms, User Agreement, and Privacy Policy.
+            I agree to Wova’s{" "}
+            <Link href="/terms" className="font-semibold text-[#0db64b] hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="font-semibold text-[#0db64b] hover:underline">
+              Privacy Policy
+            </Link>
+            .
           </span>
         </label>
 

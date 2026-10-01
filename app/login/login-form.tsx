@@ -67,9 +67,6 @@ export default function LoginForm() {
             Create an account
           </Link>
         </p>
-        <p className="mt-4 text-center text-[11px] leading-5 text-muted">
-          Demo · maya@talent.test · jordan@northfield.co · Hireline123!
-        </p>
       </div>
     );
   }

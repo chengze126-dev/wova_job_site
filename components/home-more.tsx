@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 const categories = [
-  { name: "Software Development", jobs: "4,820", href: "/jobs?q=Software" },
-  { name: "UI / UX Design", jobs: "1,640", href: "/jobs?q=Designer" },
-  { name: "Data & Analytics", jobs: "980", href: "/jobs?q=Data" },
-  { name: "Product Management", jobs: "720", href: "/jobs?q=Product" },
-  { name: "Marketing", jobs: "1,210", href: "/jobs?q=Marketing" },
-  { name: "Writing & Content", jobs: "640", href: "/jobs?q=Writer" },
+  { name: "Software Development", href: "/jobs?q=Software" },
+  { name: "UI / UX Design", href: "/jobs?q=Designer" },
+  { name: "Data & Analytics", href: "/jobs?q=Data" },
+  { name: "Product Management", href: "/jobs?q=Product" },
+  { name: "Marketing", href: "/jobs?q=Marketing" },
+  { name: "Writing & Content", href: "/jobs?q=Writer" },
 ];
 
 const reasons = [
@@ -49,7 +49,7 @@ export function HomeMore() {
                 className="rounded-[12px] border border-line bg-cream px-[18px] py-[18px] transition hover:border-[#b7e4c7] hover:shadow-[0_8px_24px_rgba(15,23,42,0.05)]"
               >
                 <p className="text-[16px] font-semibold text-ink">{category.name}</p>
-                <p className="mt-[4px] text-[13px] text-[#16a34a]">{category.jobs} open roles</p>
+                <p className="mt-[4px] text-[13px] text-[#16a34a]">Browse jobs</p>
               </Link>
             ))}
           </div>

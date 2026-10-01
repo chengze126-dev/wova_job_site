@@ -5,8 +5,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { SKILL_PASS_SCORE } from "@/lib/constants";
 import { getStackQuestionById, pickTestQuestions, type SkillMcq } from "@/lib/skill-bank";
 import { getSkillStack, QUESTIONS_PER_TEST } from "@/lib/skill-stacks";
+import { isAdminEmail } from "@/lib/admin";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+
+const HEARTBEAT_MAX_MS = 20_000;
+const FRAME_MAX_CHARS = 180_000;
 
 export type SkillQuestionView = {
   id: string;
@@ -14,6 +18,21 @@ export type SkillQuestionView = {
   options: string[];
   category: string;
   kind: "mcq";
+};
+
+export type LiveSkillMonitor = {
+  id: string;
+  talentName: string;
+  talentEmail: string;
+  stackName: string;
+  questionIndex: number;
+  questionCount: number;
+  cameraOn: boolean;
+  cameraLive: boolean;
+  cameraState: "live" | "off" | "lost" | "starting";
+  lastHeartbeat: string | null;
+  startedAt: string;
+  frame: string | null;
 };
 
 function toView(question: SkillMcq): SkillQuestionView {
@@ -24,6 +43,24 @@ function toView(question: SkillMcq): SkillQuestionView {
     category: question.category,
     kind: "mcq",
   };
+}
+
+function heartbeatFresh(lastHeartbeat: Date | null, maxMs = HEARTBEAT_MAX_MS) {
+  if (!lastHeartbeat) return false;
+  return Date.now() - lastHeartbeat.getTime() <= maxMs;
+}
+
+function cameraConfirmed(attempt: { cameraOn: boolean; lastHeartbeat: Date | null }) {
+  return Boolean(attempt.cameraOn && heartbeatFresh(attempt.lastHeartbeat));
+}
+
+function parseQuestionCount(answers: string | null) {
+  try {
+    const stored = answers ? (JSON.parse(answers) as { questionIds?: string[] }) : {};
+    return Array.isArray(stored.questionIds) ? stored.questionIds.length : QUESTIONS_PER_TEST;
+  } catch {
+    return QUESTIONS_PER_TEST;
+  }
 }
 
 export async function getSkillQuestions(stackSlug: string) {
@@ -38,30 +75,104 @@ export async function getSkillQuestions(stackSlug: string) {
   const attempt = await prisma.skillAttempt.create({
     data: {
       talentId: user.id,
-      cameraEnabled: true,
+      cameraEnabled: false,
+      cameraOn: false,
+      questionIndex: 0,
+      stackName: stack.name,
       answers: JSON.stringify({ stack: stack.slug, questionIds: selected.map((q) => q.id) }),
     },
   });
 
   return {
-    attemptId: attempt.id,
+    attemptId: attempt!.id,
     stack: stack.name,
     questions: selected.map(toView),
   };
 }
 
-export async function submitSkillTest(
+export async function pingSkillTest(
   attemptId: string,
-  answers: { mcq: Record<string, number> },
-  cameraEnabled: boolean,
+  payload: { cameraOn: boolean; questionIndex: number; frame?: string | null },
 ) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "TALENT") return { error: "Only talents can ping this test." };
+
+  const attempt = await prisma.skillAttempt.findUnique({ where: { id: attemptId } });
+  if (!attempt || attempt.talentId !== user.id) return { error: "Attempt not found." };
+  if (attempt.completedAt) return { ok: true as const, cameraConfirmed: false };
+
+  const frame =
+    typeof payload.frame === "string" &&
+    payload.frame.startsWith("data:image/") &&
+    payload.frame.length <= FRAME_MAX_CHARS
+      ? payload.frame
+      : undefined;
+
+  await prisma.skillAttempt.update({
+    where: { id: attemptId },
+    data: {
+      cameraOn: Boolean(payload.cameraOn),
+      cameraEnabled: Boolean(payload.cameraOn),
+      lastHeartbeat: new Date(),
+      questionIndex: Math.max(0, Number(payload.questionIndex) || 0),
+      ...(frame ? { cameraFrame: frame } : {}),
+    },
+  });
+
+  return { ok: true as const, cameraConfirmed: Boolean(payload.cameraOn) };
+}
+
+export async function getLiveSkillMonitors(options?: {
+  frames?: boolean;
+}): Promise<LiveSkillMonitor[] | { error: string }> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "ADMIN" || !isAdminEmail(user.email)) {
+    return { error: "Admin only." };
+  }
+
+  const includeFrames = options?.frames !== false;
+  const attempts = await prisma.skillAttempt.findMany({
+    where: { completedAt: null },
+    include: { talent: true },
+    orderBy: { startedAt: "desc" },
+  });
+
+  return attempts.map((attempt) => {
+    const live = cameraConfirmed(attempt);
+    const cameraState: LiveSkillMonitor["cameraState"] = !attempt.lastHeartbeat
+      ? "starting"
+      : live
+        ? "live"
+        : attempt.cameraOn
+          ? "lost"
+          : "off";
+    return {
+      id: attempt.id,
+      talentName: attempt.talent?.name || "Unknown talent",
+      talentEmail: attempt.talent?.email || "",
+      stackName: attempt.stackName || "Skill test",
+      questionIndex: attempt.questionIndex,
+      questionCount: parseQuestionCount(attempt.answers),
+      cameraOn: attempt.cameraOn,
+      cameraLive: live,
+      cameraState,
+      lastHeartbeat: attempt.lastHeartbeat ? attempt.lastHeartbeat.toISOString() : null,
+      startedAt: attempt.startedAt.toISOString(),
+      frame: includeFrames && live ? attempt.cameraFrame : null,
+    };
+  });
+}
+
+export async function submitSkillTest(attemptId: string, answers: { mcq: Record<string, number> }) {
   const user = await getCurrentUser();
   if (!user || user.role !== "TALENT") return { error: "Only talents can submit this test." };
 
   const attempt = await prisma.skillAttempt.findUnique({ where: { id: attemptId } });
   if (!attempt || attempt.talentId !== user.id) return { error: "Attempt not found." };
   if (attempt.completedAt) return { error: "This attempt was already submitted." };
-  if (!cameraEnabled) return { error: "Camera must stay on for the full test." };
+  if (!cameraConfirmed(attempt)) {
+    return { error: "Camera must stay on for the full test. Admin could not confirm a live camera." };
+  }
 
   let questionIds: string[] = [];
   try {
@@ -87,7 +198,8 @@ export async function submitSkillTest(
       completedAt: new Date(),
       score,
       passed,
-      cameraEnabled,
+      cameraEnabled: true,
+      cameraOn: true,
       answers: JSON.stringify({ ...answers, questionIds }),
     },
   });

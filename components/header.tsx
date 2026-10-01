@@ -8,6 +8,7 @@ import { logoutUser } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
+import { AdminMonitorLink } from "./admin-skill-alert";
 
 const navLinks = [
   { href: "/jobs", label: "Jobs" },
@@ -15,7 +16,7 @@ const navLinks = [
   { href: "/#resources", label: "Resources" },
 ];
 
-const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/verify-email"]);
+const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"]);
 
 export function Header({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
@@ -85,9 +86,9 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
                 </Link>
               ) : null}
               {user.role === "ADMIN" ? (
-                <Link href="/admin" className={`hidden lg:inline ${linkClass}`}>
+                <AdminMonitorLink href="/admin" className={`hidden lg:inline ${linkClass}`}>
                   Monitor
-                </Link>
+                </AdminMonitorLink>
               ) : null}
               <form action={logoutUser}>
                 <button className={linkClass}>Sign out</button>
@@ -168,9 +169,12 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
                   </Link>
                 ) : null}
                 {user.role === "ADMIN" ? (
-                  <Link href="/admin" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
+                  <AdminMonitorLink
+                    href="/admin"
+                    className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}
+                  >
                     Monitor
-                  </Link>
+                  </AdminMonitorLink>
                 ) : null}
                 <form action={logoutUser}>
                   <button className={`w-full rounded-[8px] px-2 py-2.5 text-left ${onDark ? "text-white/95" : "text-header-fg"}`}>Sign out</button>

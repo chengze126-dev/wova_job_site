@@ -53,7 +53,7 @@ export function AuthShell({
               {subtitle ?? "Discover opportunities, hire verified talent, and grow your career on one platform."}
             </p>
             <div className="mt-9 grid grid-cols-3 gap-3">
-              <Stat value="24k+" label="Active jobs" />
+              <Stat value="Live" label="Job marketplace" />
               <Stat value="Verified" label="Talent badge" />
               <Stat value="Free" label="To post a job" />
             </div>

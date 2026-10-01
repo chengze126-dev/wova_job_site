@@ -7,18 +7,16 @@ export function TalentLogo({
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 overflow-hidden rounded-full ${className}`}
-      style={{ width: size, height: size }}
+      className={`inline-block shrink-0 overflow-hidden rounded-full bg-cover bg-center ${className}`}
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: "url(/talent-badge.png)",
+      }}
       title="Passed the skill test"
-    >
-      <img
-        src="/talent-badge.png?v=seal"
-        alt="Talent badge"
-        width={size}
-        height={size}
-        className="h-full w-full object-cover"
-      />
-    </span>
+      role="img"
+      aria-label="Talent badge"
+    />
   );
 }
 

@@ -1,11 +1,15 @@
 import { siteUrl } from "./site";
 
 export function mailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY);
+  return Boolean((process.env.RESEND_API_KEY || "").trim());
 }
 
 export function emailFrom() {
-  return process.env.EMAIL_FROM || "Wova <beth.t@example.com>";
+  return (process.env.EMAIL_FROM || "Wova <beth.t@example.com>").trim();
+}
+
+export function usesResendTestSender() {
+  return /resend\.dev/i.test(emailFrom());
 }
 
 export async function sendMail({
@@ -19,9 +23,16 @@ export async function sendMail({
   html: string;
   text: string;
 }) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return { ok: false as const, error: "not_configured" };
+  const key = (process.env.RESEND_API_KEY || "").trim();
+  if (!key) {
+    return {
+      ok: false as const,
+      error: "not_configured",
+      message: "Email sending is not configured. Add RESEND_API_KEY in Vercel.",
+    };
+  }
 
+  const from = emailFrom();
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -29,7 +40,7 @@ export async function sendMail({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: emailFrom(),
+      from,
       to: [to],
       subject,
       html,
@@ -40,10 +51,41 @@ export async function sendMail({
   if (!response.ok) {
     const body = await response.text();
     console.error("Resend failed", response.status, body);
-    return { ok: false as const, error: "send_failed" };
+    return {
+      ok: false as const,
+      error: "send_failed",
+      message: humanizeResendError(response.status, body, from),
+    };
   }
 
   return { ok: true as const };
+}
+
+function humanizeResendError(status: number, body: string, from: string) {
+  let detail = body;
+  try {
+    const parsed = JSON.parse(body) as { message?: string };
+    if (parsed.message) detail = parsed.message;
+  } catch {
+    /* keep raw body */
+  }
+  const lower = detail.toLowerCase();
+  if (status === 401 || lower.includes("api key")) {
+    return "RESEND_API_KEY is invalid. Check the Vercel environment variable.";
+  }
+  if (
+    status === 403 ||
+    lower.includes("not verified") ||
+    lower.includes("domain") ||
+    lower.includes("testing emails") ||
+    lower.includes("own email")
+  ) {
+    if (usesResendTestSender() || /resend\.dev/i.test(from)) {
+      return "Resend's test sender can only email the Resend account owner. Verify wova.cc in Resend and set EMAIL_FROM to Wova <noreply@wova.cc>.";
+    }
+    return `Resend rejected the sender ${from}. Verify wova.cc in Resend and set EMAIL_FROM to Wova <noreply@wova.cc>.`;
+  }
+  return `Could not send email (${status}). ${detail}`.slice(0, 280);
 }
 
 export function verifyEmailContent({

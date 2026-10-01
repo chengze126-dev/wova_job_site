@@ -10,7 +10,17 @@ function vercelOrigin() {
   return "";
 }
 
-/** Stripe return URLs, metadata, and other absolute links. */
+function isLocalHost(url: string) {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
+/** Stripe return URLs, auth emails, and other absolute links. */
 export function siteUrl() {
-  return (process.env.AUTH_URL || vercelOrigin() || SITE_ORIGIN).replace(/\/$/, "");
+  const envUrl = (process.env.AUTH_URL || "").replace(/\/$/, "");
+  if (process.env.VERCEL) {
+    if (envUrl && !isLocalHost(envUrl)) return envUrl;
+    if (process.env.VERCEL_ENV === "production") return SITE_ORIGIN;
+    return (vercelOrigin() || SITE_ORIGIN).replace(/\/$/, "");
+  }
+  return (envUrl || vercelOrigin() || "http://localhost:3000").replace(/\/$/, "");
 }

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { updateProfile } from "@/app/actions/auth";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
+import { PhoneInput } from "@/components/phone-input";
+import { LocationInput } from "@/components/location-input";
 import { SubmitButton } from "@/components/submit-button";
 
 export default async function ProfileSettingsPage() {
@@ -30,6 +32,13 @@ export default async function ProfileSettingsPage() {
                   className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink"
                 />
               </label>
+              <LocationInput
+                combinedName="companyLocation"
+                defaultCountry={user.country}
+                defaultCity={user.companyLocation?.split(",")[0]?.trim()}
+                label="Company location"
+              />
+              <PhoneInput defaultPhone={user.phone} defaultCountry={user.country} />
               <label className="block text-sm">
                 Bio
                 <textarea

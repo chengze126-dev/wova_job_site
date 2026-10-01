@@ -3,6 +3,8 @@ import { parseSkills } from "@/lib/constants";
 import { parseExtras } from "@/lib/profile-extras";
 import { updateProfileBasics } from "@/app/actions/profile";
 import { AvatarInput } from "@/components/avatar-input";
+import { PhoneInput } from "@/components/phone-input";
+import { LocationInput } from "@/components/location-input";
 import { SubmitButton } from "@/components/submit-button";
 
 const fieldClass =
@@ -19,10 +21,8 @@ export function ProfileSettingsForm({ profile }: { profile: User }) {
         Name
         <input name="name" defaultValue={profile.name} className={fieldClass} />
       </label>
-      <label className="block text-sm">
-        City
-        <input name="city" defaultValue={extras.city || ""} className={fieldClass} />
-      </label>
+      <LocationInput defaultCity={extras.city} defaultCountry={profile.country} required />
+      <PhoneInput defaultPhone={profile.phone} defaultCountry={profile.country} />
       <label className="block text-sm">
         Title
         <input name="title" defaultValue={profile.title || ""} className={fieldClass} />
@@ -40,8 +40,16 @@ export function ProfileSettingsForm({ profile }: { profile: User }) {
         Open for work
       </label>
       <label className="block text-sm">
+        LinkedIn URL
+        <input name="linkedinUrl" defaultValue={profile.linkedinUrl || ""} placeholder="https://www.linkedin.com/in/you" className={fieldClass} />
+      </label>
+      <label className="block text-sm">
         GitHub URL
-        <input name="githubUrl" defaultValue={extras.githubUrl || ""} className={fieldClass} />
+        <input name="githubUrl" defaultValue={extras.githubUrl || ""} placeholder="https://github.com/you" className={fieldClass} />
+      </label>
+      <label className="block text-sm">
+        Stack Overflow URL
+        <input name="stackoverflowUrl" defaultValue={extras.stackoverflowUrl || ""} placeholder="https://stackoverflow.com/users/..." className={fieldClass} />
       </label>
       <label className="block text-sm">
         Skills (comma-separated)

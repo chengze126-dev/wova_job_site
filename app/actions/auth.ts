@@ -23,7 +23,9 @@ import { COMPANY_SIZES, COUNTRIES, INDUSTRIES, parseSkills } from "@/lib/constan
 import { savePublicUpload } from "@/lib/uploads";
 import { revalidatePath } from "next/cache";
 import { isStrongPassword } from "@/lib/password";
-import { emptyExtras, stringifyExtras } from "@/lib/profile-extras";
+import { parseExtras, stringifyExtras } from "@/lib/profile-extras";
+import type { OAuthProfile } from "@/lib/oauth";
+import { randomBytes } from "crypto";
 import { mailConfigured, sendMail, usesResendTestSender, verifyEmailContent, resetPasswordContent } from "@/lib/mail";
 import { siteUrl } from "@/lib/site";
 import { isAdminEmail } from "@/lib/admin";
@@ -139,6 +141,78 @@ export async function loginUser(formData: FormData) {
   redirect("/");
 }
 
+export async function completeOAuthSignIn({
+  profile,
+  role,
+}: {
+  profile: OAuthProfile;
+  role: "CLIENT" | "TALENT";
+}) {
+  const email = profile.email.toLowerCase();
+  if (isAdminEmail(email)) {
+    throw new Error("Use email and password for the admin account.");
+  }
+  if (role === "CLIENT") {
+    throw new Error("Employers create an account with email. Social login is for talent.");
+  }
+  const accountRole = "TALENT";
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (user && user.role !== "TALENT") {
+    throw new Error("Employers log in with email. Social accounts are for talent.");
+  }
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email,
+        name: profile.name,
+        passwordHash: await hash(randomBytes(24).toString("hex"), 10),
+        role: accountRole,
+        country: "United States",
+        connects: 0,
+        emailVerified: true,
+        avatarUrl: profile.avatarUrl || undefined,
+        linkedinUrl:
+          profile.provider === "linkedin" && profile.profileUrl?.includes("linkedin.com/in/")
+            ? profile.profileUrl
+            : undefined,
+      },
+    });
+  }
+
+  const extras = parseExtras(user.extras);
+  if (profile.provider === "github") {
+    extras.githubUrl = profile.profileUrl || extras.githubUrl;
+    extras.githubId = profile.id;
+  }
+  if (profile.provider === "linkedin") extras.linkedinId = profile.id;
+  if (profile.provider === "google") extras.googleId = profile.id;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: true,
+      extras: stringifyExtras(extras),
+      avatarUrl: user.avatarUrl || profile.avatarUrl || undefined,
+      linkedinUrl:
+        user.linkedinUrl ||
+        (profile.provider === "linkedin" && profile.profileUrl?.includes("linkedin.com/in/") ? profile.profileUrl : undefined),
+    },
+  });
+  const next = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!next) throw new Error("Could not finish social sign-in.");
+  await rememberSignup({
+    id: next.id,
+    email: next.email,
+    name: next.name,
+    role: next.role,
+    country: next.country,
+    passwordHash: next.passwordHash,
+    emailVerified: true,
+  });
+  await createSession(toSessionUser({ ...next, emailVerified: true }));
+  continueAfterAuth({ ...next, emailVerified: true });
+}
+
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") || "")
     .trim()
@@ -219,21 +293,23 @@ export async function completeTalentOnboarding(formData: FormData) {
   const user = await getCurrentUser();
   if (!user || user.role !== "TALENT") return { error: "Only talent accounts can complete this step." };
 
-  const linkedinUrl = String(formData.get("linkedinUrl") || "").trim();
+  const linkedinUrl = String(formData.get("linkedinUrl") || "").trim() || user.linkedinUrl || "";
+  const githubUrl = String(formData.get("githubUrl") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const bio = String(formData.get("bio") || "").trim();
   const title = String(formData.get("title") || "").trim();
   const hourlyRate = Number(String(formData.get("hourlyRate") || "").trim());
   const skills = parseSkills(String(formData.get("skills") || ""));
   const city = String(formData.get("city") || "").trim();
+  const country = String(formData.get("country") || "").trim();
   const resume = formData.get("resume");
   const avatar = formData.get("avatar");
 
   if (!linkedinUrl.includes("linkedin.com")) {
     return { error: "Enter a full LinkedIn profile URL." };
   }
-  if (phone.replace(/\D/g, "").length < 10) {
-    return { error: "Enter a valid phone number." };
+  if (phone.replace(/\D/g, "").length < 8) {
+    return { error: "Enter a valid phone number with country code." };
   }
   if (title.length < 4) return { error: "Add a professional title, like Full-Stack Developer." };
   if (!Number.isFinite(hourlyRate) || hourlyRate < 5 || hourlyRate > 500) {
@@ -242,16 +318,21 @@ export async function completeTalentOnboarding(formData: FormData) {
   if (skills.length < 2) return { error: "Add at least two skills." };
 
   if (!(avatar instanceof File) || avatar.size === 0) {
-    return { error: "Upload a profile photo to continue." };
+    if (!user.avatarUrl) return { error: "Upload a profile photo to continue." };
   }
-  const avatarSaved = await savePublicUpload({
-    file: avatar,
-    folder: "avatars",
-    userId: user.id,
-    allowed: [".jpg", ".jpeg", ".png", ".webp"],
-    maxBytes: 5 * 1024 * 1024,
-  });
-  if ("error" in avatarSaved) return { error: avatarSaved.error };
+  let avatarUrl = user.avatarUrl;
+  if (avatar instanceof File && avatar.size > 0) {
+    const avatarSaved = await savePublicUpload({
+      file: avatar,
+      folder: "avatars",
+      userId: user.id,
+      allowed: [".jpg", ".jpeg", ".png", ".webp"],
+      maxBytes: 5 * 1024 * 1024,
+    });
+    if ("error" in avatarSaved) return { error: avatarSaved.error };
+    avatarUrl = avatarSaved.url;
+  }
+  if (!avatarUrl) return { error: "Upload a profile photo to continue." };
 
   let resumeUrl = user.resumeUrl;
   if (resume instanceof File && resume.size > 0) {
@@ -267,8 +348,9 @@ export async function completeTalentOnboarding(formData: FormData) {
   }
   if (!resumeUrl) return { error: "Upload your resume to continue." };
 
-  const extras = emptyExtras();
-  extras.city = city || undefined;
+  const extras = parseExtras(user.extras);
+  extras.city = city || extras.city;
+  if (githubUrl) extras.githubUrl = githubUrl;
 
   await prisma.user.update({
     where: { id: user.id },
@@ -277,12 +359,13 @@ export async function completeTalentOnboarding(formData: FormData) {
       phone,
       bio,
       resumeUrl,
-      avatarUrl: avatarSaved.url,
+      avatarUrl,
       title,
       hourlyRate,
       skills: JSON.stringify(skills),
       extras: stringifyExtras(extras),
       onboardingDone: true,
+      ...(country ? { country } : {}),
     },
   });
 
@@ -298,13 +381,14 @@ export async function completeClientOnboarding(formData: FormData) {
   const companyIndustry = String(formData.get("companyIndustry") || "").trim();
   const companyWebsite = String(formData.get("companyWebsite") || "").trim();
   const companyLocation = String(formData.get("companyLocation") || "").trim();
+  const country = String(formData.get("country") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const bio = String(formData.get("bio") || "").trim();
 
   if (companyName.length < 2) return { error: "Company name is required." };
   if (!COMPANY_SIZES.some((s) => s.value === companySize)) return { error: "Select a company size." };
   if (!INDUSTRIES.includes(companyIndustry)) return { error: "Select an industry." };
-  if (phone.replace(/\D/g, "").length < 10) return { error: "Enter a valid phone number." };
+  if (phone.replace(/\D/g, "").length < 8) return { error: "Enter a valid phone number with country code." };
 
   await prisma.user.update({
     where: { id: user.id },
@@ -317,6 +401,7 @@ export async function completeClientOnboarding(formData: FormData) {
       phone,
       bio,
       onboardingDone: true,
+      ...(country ? { country } : {}),
     },
   });
 
@@ -331,6 +416,15 @@ export async function updateProfile(formData: FormData) {
   if (name.length < 2) return { error: "Name is required." };
 
   const data: Record<string, unknown> = { bio, name };
+  const phone = String(formData.get("phone") || "").trim();
+  const country = String(formData.get("country") || "").trim();
+  const companyLocation = String(formData.get("companyLocation") || "").trim();
+  if (phone && phone.replace(/\D/g, "").length < 8) {
+    return { error: "Enter a valid phone number with country code." };
+  }
+  if (phone) data.phone = phone;
+  if (country) data.country = country;
+  if (companyLocation) data.companyLocation = companyLocation;
   if (user.role === "TALENT") {
     const title = String(formData.get("title") || "").trim();
     const hourlyRate = Number(String(formData.get("hourlyRate") || "").trim());

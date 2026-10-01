@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { MessageComposer } from "@/components/message-composer";
 import { formatDate } from "@/lib/utils";
 import { RefreshOnInterval } from "@/components/refresh-on-interval";
+import { canSendDirectMessage } from "@/app/actions/messages";
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,21 +24,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     redirect("/messages");
   }
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
-  const contractStarted =
-    user.role === "ADMIN"
-      ? true
-      : Boolean(
-          await prisma.application.findFirst({
-            where: {
-              status: "HIRED",
-              OR: [
-                { talentId: user.id, job: { clientId: other.id } },
-                { talentId: other.id, job: { clientId: user.id } },
-              ],
-            },
-            select: { id: true },
-          }),
-        );
+  const canSend = (await canSendDirectMessage(user, other)).ok;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col px-5 py-10">
@@ -60,11 +47,11 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           );
         })}
       </div>
-      {contractStarted ? (
+      {canSend ? (
         <MessageComposer conversationId={id} />
       ) : (
         <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          Messaging is locked until the contract starts.
+          You can reply after a contract starts. Clients can still message you now.
         </p>
       )}
     </div>

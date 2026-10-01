@@ -16,7 +16,6 @@ export default function SignupForm() {
   const preset = params.get("role") === "CLIENT" || params.get("role") === "TALENT" ? (params.get("role") as Role) : null;
   const [role, setRole] = useState<Role | null>(preset);
   const [password, setPassword] = useState("");
-  const [socialNote, setSocialNote] = useState("");
   const [state, action] = useActionState(
     async (_prev: { error?: string } | null, formData: FormData) => registerUser(formData),
     null,
@@ -42,21 +41,22 @@ export default function SignupForm() {
         </button>
       </p>
 
-      <div className="mt-4">
-        <SocialAuthButtons
-          onUnavailable={(provider) =>
-            setSocialNote(`${provider} sign-up is not enabled yet. Create your account with email.`)
-          }
-        />
-      </div>
-
-      <div className="my-3.5">
-        <AuthDivider />
-      </div>
+      {role === "TALENT" ? (
+        <>
+          <div className="mt-4">
+            <SocialAuthButtons role={role} />
+          </div>
+          <div className="my-3.5">
+            <AuthDivider />
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-[13px] text-muted">Employers create an account with email. Social login is for talent.</p>
+      )}
 
       <form action={action} className="space-y-2.5">
         <input type="hidden" name="role" value={role} />
-        <AuthError message={state?.error || socialNote} />
+        <AuthError message={state?.error} />
 
         <div className="grid gap-2.5 sm:grid-cols-2">
           <AuthField label="First name">

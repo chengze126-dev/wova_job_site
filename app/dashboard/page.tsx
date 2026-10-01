@@ -77,7 +77,7 @@ async function renderDashboard() {
             <h1 className="font-display mt-2 text-4xl">{user.companyName}</h1>
             <p className="mt-2 text-muted">
               {user.companySize} · {user.companyIndustry}
-              {user.paymentConnected ? " · Payment connected" : " · Connect payment to hire smoothly"}
+              {user.paymentConnected ? " · Payment connected" : " · Connect payment before posting a job"}
             </p>
           </div>
           <div className="flex gap-3">
@@ -85,7 +85,7 @@ async function renderDashboard() {
               Payment
             </Link>
             <Link
-              href="/jobs/new"
+              href={user.paymentConnected ? "/jobs/new" : "/billing?next=/jobs/new"}
               className="workora-cta rounded-full bg-[#0db64b] px-4 py-2 text-sm font-semibold transition hover:bg-[#0aa542]"
             >
               Post a job

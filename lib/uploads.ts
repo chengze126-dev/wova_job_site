@@ -2,7 +2,14 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { dataDirectory } from "./paths";
 
-const PUBLIC_FOLDERS = new Set(["avatars", "resumes", "proposals"]);
+const PUBLIC_FOLDERS = new Set(["avatars", "resumes", "proposals", "portfolio"]);
+
+const IMAGE_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
 
 export function uploadsRoot() {
   if (process.env.VERCEL) return path.join(dataDirectory(), "uploads");
@@ -40,6 +47,14 @@ export async function savePublicUpload({
   const dir = path.join(uploadsRoot(), folder);
   await mkdir(dir, { recursive: true });
   const filename = `${userId}-${Date.now()}${ext}`;
-  await writeFile(path.join(dir, filename), Buffer.from(await file.arrayBuffer()));
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await writeFile(path.join(dir, filename), buffer);
+
+  // Avatars/portfolio must survive Vercel’s ephemeral /tmp disk, so persist in the DB as a data URL.
+  if (folder === "avatars" || folder === "portfolio") {
+    const mime = IMAGE_MIME[ext] || file.type || "image/jpeg";
+    return { url: `data:${mime};base64,${buffer.toString("base64")}` };
+  }
+
   return { url: publicUploadUrl(folder, filename) };
 }

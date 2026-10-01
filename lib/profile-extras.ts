@@ -13,6 +13,9 @@ export type ProfileExtras = {
   hoursPerWeek?: string;
   avgResponse?: string;
   githubUrl?: string;
+  githubId?: string;
+  linkedinId?: string;
+  googleId?: string;
   stackoverflowUrl?: string;
   stackoverflowName?: string;
   videoTitle?: string;

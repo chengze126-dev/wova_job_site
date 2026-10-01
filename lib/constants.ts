@@ -150,10 +150,14 @@ export function clientReady(user: {
   role: string;
   onboardingDone: boolean;
   companyName: string | null;
+  paymentConnected?: boolean;
 }) {
   if (user.role !== "CLIENT") return { ok: false, reason: "Not a client account." };
   if (!user.onboardingDone || !user.companyName) {
     return { ok: false, reason: "Complete company onboarding first." };
+  }
+  if (!user.paymentConnected) {
+    return { ok: false, reason: "Connect a payment method before you post a job." };
   }
   return { ok: true, reason: "" };
 }

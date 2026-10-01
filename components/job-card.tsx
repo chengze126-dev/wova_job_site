@@ -22,7 +22,15 @@ export type JobCardJob = {
   _count?: { applications: number };
 };
 
-export function JobCard({ job, compact = false }: { job: JobCardJob; compact?: boolean }) {
+export function JobCard({
+  job,
+  compact = false,
+  matchCount,
+}: {
+  job: JobCardJob;
+  compact?: boolean;
+  matchCount?: number;
+}) {
   const skills = parseSkills(job.skills);
   const hourly = job.budgetType === "hourly";
   const budget =
@@ -68,6 +76,9 @@ export function JobCard({ job, compact = false }: { job: JobCardJob; compact?: b
       className="block rounded-2xl border border-line bg-cream p-4 transition hover:border-brand/40 hover:shadow-[0_8px_30px_-18px_rgba(7,20,15,0.35)]"
     >
       <h3 className="text-[16px] font-semibold leading-snug">{job.title}</h3>
+      {matchCount ? (
+        <p className="mt-1 text-xs font-semibold text-[#14a800]">{matchCount} skill{matchCount === 1 ? "" : "s"} match your profile</p>
+      ) : null}
       <p className="mt-1 text-sm font-semibold">{budget}</p>
       <p className="mt-0.5 text-xs font-medium text-brand">{jobType}</p>
       <p className="text-[11px] text-muted">{duration}</p>

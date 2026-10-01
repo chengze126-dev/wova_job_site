@@ -5,11 +5,10 @@ import { useActionState, useState } from "react";
 import { loginUser } from "@/app/actions/auth";
 import { AuthDivider, AuthError, AuthField, AuthSubmit, SocialAuthButtons, authInputClass } from "@/components/auth-shell";
 
-export default function LoginForm() {
+export default function LoginForm({ oauthError }: { oauthError?: string }) {
   const [step, setStep] = useState<"email" | "password">("email");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [socialNote, setSocialNote] = useState("");
   const [state, action] = useActionState(
     async (_prev: { error?: string } | null, formData: FormData) => loginUser(formData),
     null,
@@ -23,11 +22,7 @@ export default function LoginForm() {
         <p className="mt-2 text-[13px] text-muted">Use your Wova email to continue.</p>
 
         <div className="mt-5">
-          <SocialAuthButtons
-            onUnavailable={(provider) =>
-              setSocialNote(`${provider} login is not enabled yet. Continue with email.`)
-            }
-          />
+          <SocialAuthButtons />
         </div>
 
         <div className="my-5">
@@ -47,7 +42,7 @@ export default function LoginForm() {
           }}
           className="space-y-3.5"
         >
-          <AuthError message={emailError || socialNote} />
+          <AuthError message={emailError || oauthError} />
           <AuthField label="Email">
             <input
               type="email"

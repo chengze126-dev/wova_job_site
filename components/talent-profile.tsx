@@ -70,11 +70,13 @@ export function TalentProfile({
   viewerId,
   work,
   publicView,
+  canMessage,
 }: {
   profile: User;
   viewerId?: string;
   work: WorkItem[];
   publicView?: boolean;
+  canMessage?: boolean;
 }) {
   const isOwner = viewerId === profile.id;
   const editing = isOwner && !publicView;
@@ -167,7 +169,7 @@ export function TalentProfile({
                       Back to edit view
                     </Link>
                   ) : null}
-                  {viewerId && !isOwner ? (
+                  {canMessage ? (
                     <form action={startConversation.bind(null, profile.id)}>
                       <SubmitButton className="!rounded-full !bg-[#14a800] !px-6">Message</SubmitButton>
                     </form>

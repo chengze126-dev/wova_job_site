@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { startConversation } from "@/app/actions/messages";
+import { startConversation, canSendDirectMessage } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 import { TalentProfile } from "@/components/talent-profile";
 
@@ -26,12 +26,14 @@ export default async function PublicProfilePage({
       include: { job: { include: { client: true } } },
       orderBy: { createdAt: "desc" },
     });
+    const canMessage = viewer ? (await canSendDirectMessage(viewer, profile)).ok : false;
     return (
       <TalentProfile
         profile={profile}
         viewerId={viewer?.id}
         work={work}
         publicView={query.view === "public" && isSelf}
+        canMessage={canMessage}
       />
     );
   }
@@ -46,10 +48,12 @@ export default async function PublicProfilePage({
         </p>
       ) : null}
       <p className="mt-5 leading-7 text-muted">{profile.bio || "No bio yet."}</p>
-      {viewer && !isSelf ? (
+      {viewer && !isSelf && (await canSendDirectMessage(viewer, profile)).ok ? (
         <form action={startConversation.bind(null, profile.id)} className="mt-6">
           <SubmitButton>Send a DM</SubmitButton>
         </form>
+      ) : viewer && !isSelf && viewer.role === "TALENT" ? (
+        <p className="mt-6 text-sm text-muted">You can message this client after a contract starts.</p>
       ) : null}
       {isSelf ? (
         <Link

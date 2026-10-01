@@ -125,9 +125,14 @@ export async function fulfillCheckout(sessionId: string) {
   return applyPaidConnects(sessionId);
 }
 
-export async function connectClientPayment() {
+function safeBillingNext(value: string) {
+  return value === "/jobs/new" ? "/jobs/new" : "";
+}
+
+export async function connectClientPayment(formData?: FormData) {
   const user = await getCurrentUser();
   if (!user || user.role !== "CLIENT") return { error: "Only clients can connect payment." };
+  const next = safeBillingNext(String(formData?.get("next") || ""));
 
   if (!stripeEnabled()) {
     if (isVercelProduction()) return paymentsMissing();
@@ -136,7 +141,7 @@ export async function connectClientPayment() {
       data: { paymentConnected: true },
     });
     revalidatePath("/billing");
-    redirect("/billing?connected=1");
+    redirect(next ? `${next}` : "/billing?connected=1");
   }
 
   const stripe = getStripe();
@@ -160,8 +165,10 @@ export async function connectClientPayment() {
     mode: "setup",
     customer: customerId,
     metadata: { userId: user.id, purpose: "payment_setup" },
-    success_url: `${origin}/billing?setup=1&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/billing?canceled=1`,
+    success_url: next
+      ? `${origin}/billing?setup=1&next=${encodeURIComponent(next)}&session_id={CHECKOUT_SESSION_ID}`
+      : `${origin}/billing?setup=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: next ? `${origin}/billing?canceled=1&next=${encodeURIComponent(next)}` : `${origin}/billing?canceled=1`,
   });
 
   if (!session.url) return { error: "Could not start payment setup." };

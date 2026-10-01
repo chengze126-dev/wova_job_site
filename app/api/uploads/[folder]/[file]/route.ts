@@ -3,7 +3,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { uploadsRoot } from "@/lib/uploads";
 
-const FOLDERS = new Set(["avatars", "resumes", "proposals"]);
+const FOLDERS = new Set(["avatars", "resumes", "proposals", "portfolio"]);
 const FILE_NAME = /^[A-Za-z0-9._-]+$/;
 const MIME: Record<string, string> = {
   ".jpg": "image/jpeg",

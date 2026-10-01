@@ -5,7 +5,7 @@ export function mailConfigured() {
 }
 
 export function emailFrom() {
-  return (process.env.EMAIL_FROM || "Wova <beth.t@example.com>").trim();
+  return (process.env.EMAIL_FROM || "Wova <noreply@wova.cc>").trim();
 }
 
 export function usesResendTestSender() {

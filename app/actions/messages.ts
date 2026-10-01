@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { conversationPair } from "@/lib/utils";
 
-async function hasStartedContract(userId: string, otherUserId: string) {
+export async function hasStartedContract(userId: string, otherUserId: string) {
   const contract = await prisma.application.findFirst({
     where: {
       status: "HIRED",
@@ -21,6 +21,20 @@ async function hasStartedContract(userId: string, otherUserId: string) {
   return Boolean(contract);
 }
 
+export async function canSendDirectMessage(
+  from: { id: string; role: string },
+  to: { id: string; role: string },
+) {
+  if (from.id === to.id) return { ok: false, error: "You cannot message yourself." };
+  if (from.role === "ADMIN" || to.role === "ADMIN") return { ok: true };
+  if (from.role === "CLIENT" && to.role === "TALENT") return { ok: true };
+  if (from.role === "TALENT" && to.role === "CLIENT") {
+    if (await hasStartedContract(from.id, to.id)) return { ok: true };
+    return { ok: false, error: "You can message this client after a contract starts." };
+  }
+  return { ok: false, error: "Direct messages are only between clients and talent." };
+}
+
 export async function startConversation(otherUserId: string) {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
@@ -29,12 +43,8 @@ export async function startConversation(otherUserId: string) {
   const other = await prisma.user.findUnique({ where: { id: otherUserId } });
   if (!other) return { error: "User not found." };
 
-  if (user.role !== "ADMIN") {
-    const contractStarted = await hasStartedContract(user.id, otherUserId);
-    if (!contractStarted) {
-      return { error: "Messaging becomes available after the contract starts." };
-    }
-  }
+  const allowed = await canSendDirectMessage(user, other);
+  if (!allowed.ok) return { error: allowed.error };
 
   const pair = conversationPair(user.id, otherUserId);
   const existing = await prisma.conversation.findUnique({
@@ -59,13 +69,11 @@ export async function sendMessage(conversationId: string, formData: FormData) {
     return { error: "You are not in this conversation." };
   }
 
-  if (user.role !== "ADMIN") {
-    const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
-    const contractStarted = await hasStartedContract(user.id, otherUserId);
-    if (!contractStarted) {
-      return { error: "Messaging becomes available after the contract starts." };
-    }
-  }
+  const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
+  const other = await prisma.user.findUnique({ where: { id: otherUserId } });
+  if (!other) return { error: "User not found." };
+  const allowed = await canSendDirectMessage(user, other);
+  if (!allowed.ok) return { error: allowed.error };
 
   await prisma.message.create({
     data: { conversationId, senderId: user.id, content },

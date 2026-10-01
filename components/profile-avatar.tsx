@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { TalentLogo } from "@/components/badges";
 import { initials } from "@/lib/utils";
 
@@ -16,6 +19,13 @@ export function ProfileAvatar({
   const letters = initials(name) || "W";
   const badgeSize = Math.max(18, Math.round(size * 0.38));
   const ring = badge ? Math.max(3, Math.round(size * 0.055)) : 0;
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const showImage = Boolean(src) && !failed;
 
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
@@ -30,16 +40,16 @@ export function ProfileAvatar({
           border: badge ? `${ring}px solid #14a800` : undefined,
         }}
       >
-        {src ? (
-          // Native img avoids next/image hydration mismatches on this page.
+        {showImage ? (
           <img
-            src={src}
+            src={src || ""}
             alt={name}
             width={size}
             height={size}
             className="h-full w-full object-cover"
             style={{ color: "transparent", filter: "blur(0px)" }}
             suppressHydrationWarning
+            onError={() => setFailed(true)}
           />
         ) : (
           <span className="flex h-full w-full items-center justify-center">{letters}</span>

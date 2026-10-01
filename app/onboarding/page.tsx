@@ -4,6 +4,8 @@ import { COMPANY_SIZES, INDUSTRIES } from "@/lib/constants";
 import { completeClientOnboarding, completeTalentOnboarding } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/submit-button";
 import { AvatarInput } from "@/components/avatar-input";
+import { PhoneInput } from "@/components/phone-input";
+import { LocationInput } from "@/components/location-input";
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
@@ -24,11 +26,8 @@ export default async function OnboardingPage() {
           your profile is live.
         </p>
         <form action={completeTalentOnboarding} className="mt-8 space-y-4 rounded-2xl border border-line bg-cream p-6">
-          <AvatarInput personName={user.name} required />
-          <label className="block text-sm">
-            City
-            <input name="city" placeholder="Austin" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-          </label>
+          <AvatarInput personName={user.name} currentSrc={user.avatarUrl} required={!user.avatarUrl} />
+          <LocationInput defaultCity="" defaultCountry={user.country} required />
           <label className="block text-sm">
             Professional title
             <input
@@ -64,15 +63,22 @@ export default async function OnboardingPage() {
             LinkedIn profile URL
             <input
               name="linkedinUrl"
-              required
+              required={!user.linkedinUrl}
+              defaultValue={user.linkedinUrl || ""}
               placeholder="https://www.linkedin.com/in/you"
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
             />
           </label>
           <label className="block text-sm">
-            Phone number
-            <input name="phone" required placeholder="+1 555 0100" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
+            GitHub profile URL
+            <input
+              name="githubUrl"
+              defaultValue=""
+              placeholder="https://github.com/you"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
+            />
           </label>
+          <PhoneInput defaultCountry={user.country} defaultPhone={user.phone} required />
           <label className="block text-sm">
             Resume (PDF, DOC, DOCX, or TXT)
             <input name="resume" type="file" accept=".pdf,.doc,.docx,.txt" required className="mt-1 w-full text-sm" />
@@ -123,14 +129,12 @@ export default async function OnboardingPage() {
           Website
           <input name="companyWebsite" placeholder="https://" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
         </label>
-        <label className="block text-sm">
-          Location
-          <input name="companyLocation" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-        </label>
-        <label className="block text-sm">
-          Phone
-          <input name="phone" required placeholder="+1 555 0100" className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-        </label>
+        <LocationInput
+          combinedName="companyLocation"
+          defaultCountry={user.country}
+          label="Company location"
+        />
+        <PhoneInput defaultCountry={user.country} defaultPhone={user.phone} required />
         <label className="block text-sm">
           What you hire for
           <textarea name="bio" rows={4} className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />

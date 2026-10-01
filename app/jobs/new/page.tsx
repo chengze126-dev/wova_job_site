@@ -8,6 +8,7 @@ export default async function NewJobPage() {
   if (!user) redirect("/login");
   if (user.role !== "CLIENT") redirect("/dashboard");
   if (!user.onboardingDone) redirect("/onboarding");
+  if (!user.paymentConnected) redirect("/billing?next=/jobs/new");
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">

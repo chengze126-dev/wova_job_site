@@ -12,8 +12,8 @@ import { AdminMonitorLink } from "./admin-skill-alert";
 
 const navLinks = [
   { href: "/jobs", label: "Jobs" },
+  { href: "/talents", label: "Talent" },
   { href: "/companies", label: "Companies" },
-  { href: "/#resources", label: "Resources" },
 ];
 
 const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"]);
@@ -74,6 +74,12 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
             <>
               <Link href="/dashboard" className={`hidden sm:inline ${linkClass}`}>
                 Dashboard
+              </Link>
+              <Link href="/messages" className={`hidden sm:inline ${linkClass}`}>
+                Messages
+              </Link>
+              <Link href="/messages" className={`hidden sm:inline ${linkClass}`}>
+                Messages
               </Link>
               {user.role === "TALENT" ? (
                 <Link href="/skill-test" className={`hidden sm:inline ${linkClass}`}>
@@ -153,6 +159,9 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
               <>
                 <Link href="/dashboard" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
                   Dashboard
+                </Link>
+                <Link href="/messages" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
+                  Messages
                 </Link>
                 {user.role === "TALENT" ? (
                   <Link href="/skill-test" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>

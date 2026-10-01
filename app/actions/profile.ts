@@ -25,10 +25,14 @@ export async function updateProfileBasics(formData: FormData) {
   const title = String(formData.get("title") || "").trim();
   const bio = String(formData.get("bio") || "").trim();
   const city = String(formData.get("city") || "").trim();
+  const country = String(formData.get("country") || "").trim();
+  const phone = String(formData.get("phone") || "").trim();
+  const linkedinUrl = String(formData.get("linkedinUrl") || "").trim();
   const hourlyRate = Number(String(formData.get("hourlyRate") || "").trim());
   const skills = parseSkills(String(formData.get("skills") || ""));
   const hoursPerWeek = String(formData.get("hoursPerWeek") || "").trim();
   const githubUrl = String(formData.get("githubUrl") || "").trim();
+  const stackoverflowUrl = String(formData.get("stackoverflowUrl") || "").trim();
   const availableNow = formData.get("availableNow") === "on";
 
   if (name.length < 2) return { error: "Name is required." };
@@ -37,11 +41,18 @@ export async function updateProfileBasics(formData: FormData) {
     return { error: "Enter an hourly rate between $5 and $500." };
   }
   if (skills.length < 2) return { error: "Add at least two skills." };
+  if (phone && phone.replace(/\D/g, "").length < 8) {
+    return { error: "Enter a valid phone number with country code." };
+  }
+  if (linkedinUrl && !linkedinUrl.includes("linkedin.com")) {
+    return { error: "Enter a full LinkedIn profile URL." };
+  }
 
   const extras = parseExtras(user.extras);
   extras.city = city || extras.city;
   extras.hoursPerWeek = hoursPerWeek || extras.hoursPerWeek;
   extras.githubUrl = githubUrl || extras.githubUrl;
+  extras.stackoverflowUrl = stackoverflowUrl || extras.stackoverflowUrl;
   extras.availableNow = availableNow;
 
   const data: Record<string, unknown> = {
@@ -51,6 +62,9 @@ export async function updateProfileBasics(formData: FormData) {
     hourlyRate,
     skills: JSON.stringify(skills),
     extras: stringifyExtras(extras),
+    ...(country ? { country } : {}),
+    ...(phone ? { phone } : {}),
+    ...(linkedinUrl ? { linkedinUrl } : {}),
   };
 
   const avatar = formData.get("avatar");

@@ -160,25 +160,39 @@ function AuthSubmitInner({ children }: { children: ReactNode }) {
   );
 }
 
-export function SocialAuthButtons({ onUnavailable }: { onUnavailable: (provider: string) => void }) {
+export function SocialAuthButtons({
+  role,
+}: {
+  role?: "CLIENT" | "TALENT";
+  onUnavailable?: (provider: string) => void;
+}) {
+  if (role === "CLIENT") return null;
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <button
-        type="button"
-        onClick={() => onUnavailable("Google")}
-        className="flex h-[40px] items-center justify-center gap-2 rounded-[10px] border border-line bg-cream text-[13px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
-      >
-        <GoogleIcon />
-        Google
-      </button>
-      <button
-        type="button"
-        onClick={() => onUnavailable("Apple")}
-        className="flex h-[40px] items-center justify-center gap-2 rounded-[10px] border border-line bg-cream text-[13px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
-      >
-        <AppleIcon />
-        Apple
-      </button>
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        <a
+          href="/api/auth/oauth/google?role=TALENT"
+          className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
+        >
+          <GoogleIcon />
+          Google
+        </a>
+        <a
+          href="/api/auth/oauth/github?role=TALENT"
+          className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
+        >
+          <GitHubIcon />
+          GitHub
+        </a>
+        <a
+          href="/api/auth/oauth/linkedin?role=TALENT"
+          className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
+        >
+          <LinkedInIcon />
+          LinkedIn
+        </a>
+      </div>
+      <p className="mt-2 text-center text-[11px] text-muted">Social login is for talent accounts. Employers use email.</p>
     </div>
   );
 }
@@ -204,10 +218,18 @@ function GoogleIcon() {
   );
 }
 
-function AppleIcon() {
+function GitHubIcon() {
   return (
-    <svg width="14" height="16" viewBox="0 0 16 18" fill="currentColor" aria-hidden>
-      <path d="M13.2 9.5c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.9-3.5.9s-1.8-1-3-.9C3.6 4.3 2 5.2 1.2 6.9c-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.6-.8 3.1-.8s1.8.8 3 .8 2.1-1.2 2.9-2.4c.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.5-1-2.5-3.5zM10.8 3.2c.6-.8 1.1-1.9.9-3-1 .1-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.5 2.9-1.4z" />
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.6 7.6 0 0 1 8 3.5c.68 0 1.36.09 2 .26 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+    </svg>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="#0A66C2" aria-hidden>
+      <path d="M14.5 0h-13A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 14.5 0zM4.7 13.6H2.4V6h2.3v7.6zM3.6 5A1.3 1.3 0 1 1 3.6 2.4 1.3 1.3 0 0 1 3.6 5zM13.6 13.6h-2.3V9.9c0-.9 0-2-1.2-2s-1.4 1-1.4 2v3.7H6.4V6h2.2v1c.3-.6 1.1-1.2 2.2-1.2 2.4 0 2.8 1.6 2.8 3.6v4.2z" />
     </svg>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
@@ -16,6 +17,7 @@ export default async function TalentsPage({
 }) {
   const params = await searchParams;
   const viewer = await getCurrentUser();
+  if (viewer?.role === "TALENT") redirect("/jobs");
   const talents = await prisma.user.findMany({
     where: { role: "TALENT", onboardingDone: true },
     orderBy: [{ talentBadge: "desc" }, { name: "asc" }],

@@ -5,7 +5,9 @@ export const ADMIN_ID = "wova-user-admin";
 export const ADMIN_PASSWORD_DEFAULT = "Passion19991206@";
 
 export function adminPassword() {
-  return (process.env.ADMIN_PASSWORD || ADMIN_PASSWORD_DEFAULT).trim();
+  const fromEnv = (process.env.ADMIN_PASSWORD || "").trim();
+  if (fromEnv && fromEnv !== "Passion1999@") return fromEnv;
+  return ADMIN_PASSWORD_DEFAULT;
 }
 
 export function isAdminEmail(email: string | null | undefined) {

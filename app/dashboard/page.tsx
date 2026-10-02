@@ -45,7 +45,34 @@ export default async function DashboardPage() {
 
 async function renderDashboard() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    const jobs = await prisma.job.findMany({
+      where: { status: "OPEN" },
+      include: { client: true, _count: { select: { applications: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return (
+      <div className="mx-auto max-w-6xl px-5 py-12">
+        <h1 className="font-display text-4xl">Dashboard</h1>
+        <p className="mt-2 text-muted">Sign in to manage jobs, proposals, and messages.</p>
+        <div className="mt-6 flex gap-3">
+          <Link href="/login" className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold">
+            Sign in
+          </Link>
+          <Link href="/signup" className="rounded-full bg-[#0db64b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0aa542]">
+            Sign up
+          </Link>
+        </div>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          {jobs.length === 0 ? (
+            <p className="text-muted">No open jobs yet.</p>
+          ) : (
+            jobs.map((job) => <JobCard key={job.id} job={job} />)
+          )}
+        </div>
+      </div>
+    );
+  }
   if (!user.emailVerified) redirect("/verify-email");
   if (user.role === "ADMIN") redirect("/admin");
   if (!user.onboardingDone) redirect("/onboarding");

@@ -46,10 +46,12 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
     };
   }, [open]);
 
-  const navLinks = [
-    { href: "/jobs", label: "Jobs" },
-    { href: "/companies", label: "Companies" },
-  ];
+  const navLinks = user
+    ? [
+        { href: "/jobs", label: "Jobs" },
+        { href: "/companies", label: "Companies" },
+      ]
+    : [];
   const postHref = user?.role === "CLIENT" ? "/jobs/new" : user ? "/jobs" : "/signup?role=CLIENT";
   const postLabel = user?.role === "CLIENT" ? "Post a Job" : user ? "Browse jobs" : "Post a Job";
 
@@ -88,11 +90,8 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
             </>
           ) : (
             <>
-              <Link href="/signup?role=CLIENT" className={linkClass}>
-                For Employers
-              </Link>
               <Link href="/login" className={ghostBtn}>
-                Log in
+                Sign in
               </Link>
               <Link
                 href="/signup"
@@ -183,15 +182,12 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
               </>
             ) : (
               <>
-                <Link href="/signup?role=CLIENT" onClick={() => setOpen(false)} className={`rounded-[8px] px-2 py-2.5 ${onDark ? "text-white/95" : "text-header-fg"}`}>
-                  For Employers
-                </Link>
                 <Link
                   href="/login"
                   onClick={() => setOpen(false)}
                   className={`rounded-[8px] border px-3 py-2.5 text-center ${onDark ? "border-white/25 text-white/95" : "border-line text-header-fg"}`}
                 >
-                  Log in
+                  Sign in
                 </Link>
                 <Link
                   href="/signup"

@@ -4,7 +4,6 @@ import { SITE_HOST } from "@/lib/site";
 import { isAdminEmail } from "@/lib/admin";
 
 const AUTH_PREFIXES = [
-  "/dashboard",
   "/onboarding",
   "/verify-phone",
   "/skill-test",

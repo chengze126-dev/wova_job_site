@@ -271,7 +271,7 @@ export async function resetPassword(formData: FormData) {
 
 export async function logoutUser() {
   await destroySession();
-  redirect("/login");
+  redirect("/dashboard");
 }
 
 export async function completeTalentOnboarding(formData: FormData) {

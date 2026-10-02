@@ -84,7 +84,7 @@ async function openTurso(): Promise<SqlDatabase> {
   const authToken = remoteDatabaseToken();
   if (!url) throw new Error("Missing TURSO_DATABASE_URL.");
   if (!authToken) throw new Error("Missing TURSO_AUTH_TOKEN.");
-  const { createClient } = await import("@libsql/client");
+  const { createClient } = await import("@libsql/client/web");
   const client = createClient({ url, authToken });
   return {
     kind: "remote",

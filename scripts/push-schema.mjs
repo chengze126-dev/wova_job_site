@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { createClient } from "@libsql/client";
+import { createClient } from "@libsql/client/web";
 
 function loadEnv() {
   try {
@@ -20,7 +20,7 @@ loadEnv();
 const url = process.env.TURSO_DATABASE_URL?.trim();
 const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
 if (!url || !authToken) {
-  console.error("Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN, then run: npm run db:turso");
+  console.error("Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in .env, then run: npm run db:turso");
   process.exit(1);
 }
 

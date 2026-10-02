@@ -13,7 +13,7 @@
     "test": "tsx --test lib/grade-code.test.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "tsx prisma/seed.ts",
-    "db:turso": "tsx scripts/push-schema.ts"
+    "db:turso": "node scripts/push-schema.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  outputFileTracingExcludes: {
+    "/*": ["./public/uploads/**/*", "./data/**/*", "./.git/**/*"],
+  },
   serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],

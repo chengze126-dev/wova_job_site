@@ -20,15 +20,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   const key = provider as OAuthProvider;
   const config = oauthProviders()[key];
   const requested = new URL(request.url).searchParams.get("role");
-  if (requested === "CLIENT") {
-    return NextResponse.redirect(
-      new URL(`/signup?role=CLIENT&error=${encodeURIComponent("Employers create an account with email.")}`, request.url),
-    );
-  }
-  const role = "TALENT";
+  const role = requested === "CLIENT" ? "CLIENT" : "TALENT";
   if (!config) {
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(`${key} sign-in is not configured yet.`)}`, request.url),
+      new URL(
+        `/login?error=${encodeURIComponent(
+          `${key} sign-in is not configured. Add ${key.toUpperCase()}_CLIENT_ID and ${key.toUpperCase()}_CLIENT_SECRET in Vercel, then redeploy.`,
+        )}`,
+        request.url,
+      ),
     );
   }
   const state = await new SignJWT({ purpose: "oauth", provider: key, role })

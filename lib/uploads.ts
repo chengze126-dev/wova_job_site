@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { dataDirectory } from "./paths";
 
-const PUBLIC_FOLDERS = new Set(["avatars", "resumes", "proposals", "portfolio"]);
+export const UPLOAD_FOLDERS = ["avatars", "resumes", "proposals", "portfolio"] as const;
+export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
 
 const IMAGE_MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -11,14 +11,64 @@ const IMAGE_MIME: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-export function uploadsRoot() {
-  if (process.env.VERCEL) return path.join(dataDirectory(), "uploads");
-  return path.join(process.cwd(), "public", "uploads");
+export function isUploadFolder(folder: string): folder is UploadFolder {
+  return (UPLOAD_FOLDERS as readonly string[]).includes(folder);
+}
+
+export function uploadsDir(folder: UploadFolder) {
+  if (process.env.VERCEL) {
+    switch (folder) {
+      case "avatars":
+        return path.join("/tmp", "wova-data", "uploads", "avatars");
+      case "resumes":
+        return path.join("/tmp", "wova-data", "uploads", "resumes");
+      case "proposals":
+        return path.join("/tmp", "wova-data", "uploads", "proposals");
+      case "portfolio":
+        return path.join("/tmp", "wova-data", "uploads", "portfolio");
+    }
+  }
+  switch (folder) {
+    case "avatars":
+      return path.join(process.cwd(), "public", "uploads", "avatars");
+    case "resumes":
+      return path.join(process.cwd(), "public", "uploads", "resumes");
+    case "proposals":
+      return path.join(process.cwd(), "public", "uploads", "proposals");
+    case "portfolio":
+      return path.join(process.cwd(), "public", "uploads", "portfolio");
+  }
 }
 
 export function publicUploadUrl(folder: string, filename: string) {
   if (process.env.VERCEL) return `/api/uploads/${folder}/${filename}`;
   return `/uploads/${folder}/${filename}`;
+}
+
+async function writeDiskUpload(folder: "resumes" | "proposals", filename: string, buffer: Buffer) {
+  if (process.env.VERCEL) {
+    if (folder === "resumes") {
+      const dir = path.join("/tmp", "wova-data", "uploads", "resumes");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, filename), buffer);
+      return;
+    }
+    const dir = path.join("/tmp", "wova-data", "uploads", "proposals");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, filename), buffer);
+    return;
+  }
+
+  if (folder === "resumes") {
+    const dir = path.join(process.cwd(), "public", "uploads", "resumes");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, filename), buffer);
+    return;
+  }
+
+  const dir = path.join(process.cwd(), "public", "uploads", "proposals");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, filename), buffer);
 }
 
 export async function savePublicUpload({
@@ -34,7 +84,7 @@ export async function savePublicUpload({
   allowed: string[];
   maxBytes: number;
 }) {
-  if (!PUBLIC_FOLDERS.has(folder)) {
+  if (!isUploadFolder(folder)) {
     return { error: "That upload folder is not allowed." };
   }
   if (file.size > maxBytes) {
@@ -44,17 +94,16 @@ export async function savePublicUpload({
   if (!allowed.includes(ext)) {
     return { error: `Upload a ${allowed.map((item) => item.replace(".", "").toUpperCase()).join(", ")} file.` };
   }
-  const dir = path.join(uploadsRoot(), folder);
-  await mkdir(dir, { recursive: true });
-  const filename = `${userId}-${Date.now()}${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
 
-  // Avatars/portfolio must survive Vercel’s ephemeral /tmp disk, so persist in the DB as a data URL.
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Avatars/portfolio must survive Vercel’s ephemeral disk, so persist in the DB as a data URL.
   if (folder === "avatars" || folder === "portfolio") {
     const mime = IMAGE_MIME[ext] || file.type || "image/jpeg";
     return { url: `data:${mime};base64,${buffer.toString("base64")}` };
   }
 
+  const filename = `${userId}-${Date.now()}${ext}`;
+  await writeDiskUpload(folder, filename, buffer);
   return { url: publicUploadUrl(folder, filename) };
 }

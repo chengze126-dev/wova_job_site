@@ -145,14 +145,8 @@ export async function completeOAuthSignIn({
   if (isAdminEmail(email)) {
     throw new Error("Use email and password for the admin account.");
   }
-  if (role === "CLIENT") {
-    throw new Error("Employers create an account with email. Social login is for talent.");
-  }
-  const accountRole = "TALENT";
+  const accountRole = role === "CLIENT" ? "CLIENT" : "TALENT";
   let user = await prisma.user.findUnique({ where: { email } });
-  if (user && user.role !== "TALENT") {
-    throw new Error("Employers log in with email. Social accounts are for talent.");
-  }
   if (!user) {
     user = await prisma.user.create({
       data: {
@@ -271,7 +265,7 @@ export async function resetPassword(formData: FormData) {
 
 export async function logoutUser() {
   await destroySession();
-  redirect("/dashboard");
+  redirect("/");
 }
 
 export async function completeTalentOnboarding(formData: FormData) {

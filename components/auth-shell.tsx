@@ -161,38 +161,30 @@ function AuthSubmitInner({ children }: { children: ReactNode }) {
 }
 
 export function SocialAuthButtons({
-  role,
+  role = "TALENT",
 }: {
   role?: "CLIENT" | "TALENT";
   onUnavailable?: (provider: string) => void;
 }) {
-  if (role === "CLIENT") return null;
+  const suffix = `?role=${role}`;
   return (
     <div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <a
-          href="/api/auth/oauth/google?role=TALENT"
+          href={`/api/auth/oauth/google${suffix}`}
           className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
         >
           <GoogleIcon />
           Google
         </a>
         <a
-          href="/api/auth/oauth/github?role=TALENT"
+          href={`/api/auth/oauth/github${suffix}`}
           className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
         >
           <GitHubIcon />
           GitHub
         </a>
-        <a
-          href="/api/auth/oauth/linkedin?role=TALENT"
-          className="flex h-[40px] items-center justify-center gap-1.5 rounded-[10px] border border-line bg-cream text-[12px] font-medium text-ink transition hover:border-[#b7cfc2] hover:bg-paper-2"
-        >
-          <LinkedInIcon />
-          LinkedIn
-        </a>
       </div>
-      <p className="mt-2 text-center text-[11px] text-muted">Social login is for talent accounts. Employers use email.</p>
     </div>
   );
 }
@@ -226,10 +218,3 @@ function GitHubIcon() {
   );
 }
 
-function LinkedInIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="#0A66C2" aria-hidden>
-      <path d="M14.5 0h-13A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 14.5 0zM4.7 13.6H2.4V6h2.3v7.6zM3.6 5A1.3 1.3 0 1 1 3.6 2.4 1.3 1.3 0 0 1 3.6 5zM13.6 13.6h-2.3V9.9c0-.9 0-2-1.2-2s-1.4 1-1.4 2v3.7H6.4V6h2.2v1c.3-.6 1.1-1.2 2.2-1.2 2.4 0 2.8 1.6 2.8 3.6v4.2z" />
-    </svg>
-  );
-}

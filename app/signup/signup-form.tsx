@@ -41,18 +41,12 @@ export default function SignupForm() {
         </button>
       </p>
 
-      {role === "TALENT" ? (
-        <>
-          <div className="mt-4">
-            <SocialAuthButtons role={role} />
-          </div>
-          <div className="my-3.5">
-            <AuthDivider />
-          </div>
-        </>
-      ) : (
-        <p className="mt-3 text-[13px] text-muted">Employers create an account with email. Social login is for talent.</p>
-      )}
+      <div className="mt-4">
+        <SocialAuthButtons role={role} />
+      </div>
+      <div className="my-3.5">
+        <AuthDivider />
+      </div>
 
       <form action={action} className="space-y-2.5">
         <input type="hidden" name="role" value={role} />

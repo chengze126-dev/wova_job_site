@@ -12,9 +12,11 @@
     "lint": "eslint",
     "test": "tsx --test lib/grade-code.test.ts",
     "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "tsx prisma/seed.ts"
+    "db:setup": "tsx prisma/seed.ts",
+    "db:turso": "tsx scripts/push-schema.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.10",

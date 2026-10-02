@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { COUNTRY_META, countryMeta, parsePhoneParts } from "@/lib/geo";
 
 const fieldClass =
@@ -23,6 +23,16 @@ export function PhoneInput({
   const [national, setNational] = useState(initial.national);
   const meta = useMemo(() => countryMeta(country), [country]);
   const value = national ? `${meta.dial} ${national}` : "";
+
+  useEffect(() => {
+    const next = parsePhoneParts(defaultPhone);
+    if (defaultPhone) {
+      setCountry(next.country);
+      setNational(next.national);
+    } else if (defaultCountry) {
+      setCountry(countryMeta(defaultCountry).name);
+    }
+  }, [defaultPhone, defaultCountry]);
 
   return (
     <label className="block text-sm">

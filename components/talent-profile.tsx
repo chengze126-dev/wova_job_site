@@ -68,12 +68,14 @@ function SectionHead({
 export function TalentProfile({
   profile,
   viewerId,
+  viewerRole,
   work,
   publicView,
   canMessage,
 }: {
   profile: User;
   viewerId?: string;
+  viewerRole?: string;
   work: WorkItem[];
   publicView?: boolean;
   canMessage?: boolean;
@@ -661,11 +663,13 @@ export function TalentProfile({
           </div>
         </div>
 
-        <p className="pt-2 text-sm text-muted">
-          <Link href="/talents" className="text-[#14a800]">
-            All talents
-          </Link>
-        </p>
+        {viewerRole !== "TALENT" ? (
+          <p className="pt-2 text-sm text-muted">
+            <Link href="/talents" className="text-[#14a800]">
+              All talents
+            </Link>
+          </p>
+        ) : null}
       </div>
     </div>
   );

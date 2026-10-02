@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: ["node:sqlite", "node:vm"],
+  serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
     qualities: [75, 90],

@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { prisma, type User } from "./prisma";
+import { parseExtras, stringifyExtras } from "./profile-extras";
 
 export type SessionUser = {
   id: string;
@@ -18,7 +19,66 @@ export type SignupSnapshot = {
   country: string | null;
   passwordHash: string;
   emailVerified: boolean;
+  title?: string | null;
+  bio?: string | null;
+  phone?: string | null;
+  linkedinUrl?: string | null;
+  hourlyRate?: number | null;
+  skills?: string | null;
+  city?: string | null;
+  githubUrl?: string | null;
+  hoursPerWeek?: string | null;
+  stackoverflowUrl?: string | null;
+  availableNow?: boolean;
+  onboardingDone?: boolean;
+  companyName?: string | null;
+  companyLocation?: string | null;
 };
+
+export function snapshotFromUser(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  country: string | null;
+  passwordHash: string;
+  emailVerified: boolean;
+  title?: string | null;
+  bio?: string | null;
+  phone?: string | null;
+  linkedinUrl?: string | null;
+  hourlyRate?: number | null;
+  skills?: string | null;
+  extras?: string | null;
+  onboardingDone?: boolean;
+  companyName?: string | null;
+  companyLocation?: string | null;
+}): SignupSnapshot {
+  const extras = parseExtras(user.extras);
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    country: user.country,
+    passwordHash: user.passwordHash,
+    emailVerified: user.emailVerified,
+    title: user.title,
+    bio: user.bio ? user.bio.slice(0, 1500) : null,
+    phone: user.phone,
+    linkedinUrl: user.linkedinUrl,
+    hourlyRate: user.hourlyRate,
+    skills: user.skills,
+    city: extras.city,
+    githubUrl: extras.githubUrl,
+    hoursPerWeek: extras.hoursPerWeek,
+    stackoverflowUrl: extras.stackoverflowUrl,
+    availableNow: extras.availableNow,
+    onboardingDone: user.onboardingDone,
+    companyName: user.companyName,
+    companyLocation: user.companyLocation,
+  };
+}
 
 export function toSessionUser(user: {
   id: string;
@@ -67,7 +127,22 @@ export function authCookieOptions(maxAge: number) {
 }
 
 export async function clearCookie(name: string) {
-  (await cookies()).set(name, "", { ...authCookieOptions(0), maxAge: 0 });
+  const jar = await cookies();
+  const expired = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL),
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  };
+  try {
+    jar.delete(name);
+  } catch {
+    /* older cookie stores only support set */
+  }
+  jar.set(name, "", expired);
+  jar.set(name, "", { ...expired, domain: ".wova.cc" });
 }
 
 export async function createSession(user: SessionUser, options?: { remember?: boolean }) {
@@ -107,6 +182,20 @@ export async function readSignupSnapshot(): Promise<SignupSnapshot | null> {
       country: payload.country ? String(payload.country) : null,
       passwordHash: String(payload.passwordHash),
       emailVerified: payload.emailVerified === true,
+      title: payload.title ? String(payload.title) : null,
+      bio: payload.bio ? String(payload.bio) : null,
+      phone: payload.phone ? String(payload.phone) : null,
+      linkedinUrl: payload.linkedinUrl ? String(payload.linkedinUrl) : null,
+      hourlyRate: payload.hourlyRate == null ? null : Number(payload.hourlyRate),
+      skills: payload.skills ? String(payload.skills) : null,
+      city: payload.city ? String(payload.city) : null,
+      githubUrl: payload.githubUrl ? String(payload.githubUrl) : null,
+      hoursPerWeek: payload.hoursPerWeek ? String(payload.hoursPerWeek) : null,
+      stackoverflowUrl: payload.stackoverflowUrl ? String(payload.stackoverflowUrl) : null,
+      availableNow: payload.availableNow === true,
+      onboardingDone: payload.onboardingDone === true,
+      companyName: payload.companyName ? String(payload.companyName) : null,
+      companyLocation: payload.companyLocation ? String(payload.companyLocation) : null,
     };
   } catch {
     return null;
@@ -117,10 +206,19 @@ export async function restoreUserFromSnapshot(session: SessionUser): Promise<Use
   const snapshot = await readSignupSnapshot();
   if (!snapshot || snapshot.id !== session.id) return null;
 
+  const extras = stringifyExtras({
+    ...parseExtras(null),
+    city: snapshot.city || undefined,
+    githubUrl: snapshot.githubUrl || undefined,
+    hoursPerWeek: snapshot.hoursPerWeek || undefined,
+    stackoverflowUrl: snapshot.stackoverflowUrl || undefined,
+    availableNow: snapshot.availableNow,
+  });
+
   const existing = await prisma.user.findUnique({ where: { id: session.id } });
-  if (existing) return existing;
+  if (existing) return hydrateFromSnapshot(existing, snapshot, extras);
   const byEmail = await prisma.user.findUnique({ where: { email: snapshot.email } });
-  if (byEmail) return byEmail;
+  if (byEmail) return hydrateFromSnapshot(byEmail, snapshot, extras);
 
   try {
     return await prisma.user.create({
@@ -133,10 +231,45 @@ export async function restoreUserFromSnapshot(session: SessionUser): Promise<Use
         passwordHash: snapshot.passwordHash,
         emailVerified: session.emailVerified || snapshot.emailVerified,
         connects: 0,
+        title: snapshot.title,
+        bio: snapshot.bio,
+        phone: snapshot.phone,
+        linkedinUrl: snapshot.linkedinUrl,
+        hourlyRate: snapshot.hourlyRate,
+        skills: snapshot.skills,
+        extras,
+        onboardingDone: snapshot.onboardingDone,
+        companyName: snapshot.companyName,
+        companyLocation: snapshot.companyLocation,
       },
     });
   } catch {
     return prisma.user.findUnique({ where: { email: snapshot.email } });
+  }
+}
+
+async function hydrateFromSnapshot(user: User, snapshot: SignupSnapshot, extras: string) {
+  if (user.title || user.skills || user.bio) return user;
+  if (!snapshot.title && !snapshot.skills && !snapshot.bio && !snapshot.city) return user;
+  try {
+    return await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        title: snapshot.title ?? user.title,
+        bio: snapshot.bio ?? user.bio,
+        phone: snapshot.phone ?? user.phone,
+        linkedinUrl: snapshot.linkedinUrl ?? user.linkedinUrl,
+        hourlyRate: snapshot.hourlyRate ?? user.hourlyRate,
+        skills: snapshot.skills ?? user.skills,
+        extras: user.extras || extras,
+        country: snapshot.country ?? user.country,
+        onboardingDone: snapshot.onboardingDone || user.onboardingDone,
+        companyName: snapshot.companyName ?? user.companyName,
+        companyLocation: snapshot.companyLocation ?? user.companyLocation,
+      },
+    });
+  } catch {
+    return user;
   }
 }
 

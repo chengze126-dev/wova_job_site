@@ -11,6 +11,7 @@ import { themeInitScript } from "@/lib/theme";
 import { AdminSkillAlert } from "@/components/admin-skill-alert";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const inter = Inter({
   variable: "--font-inter",

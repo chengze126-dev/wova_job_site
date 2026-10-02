@@ -26,13 +26,13 @@ export async function canSendDirectMessage(
   to: { id: string; role: string },
 ) {
   if (from.id === to.id) return { ok: false, error: "You cannot message yourself." };
-  if (from.role === "ADMIN" || to.role === "ADMIN") return { ok: true };
+  if (from.role === "ADMIN") return { ok: true };
   if (from.role === "CLIENT" && to.role === "TALENT") return { ok: true };
   if (from.role === "TALENT" && to.role === "CLIENT") {
     if (await hasStartedContract(from.id, to.id)) return { ok: true };
     return { ok: false, error: "You can message this client after a contract starts." };
   }
-  return { ok: false, error: "Direct messages are only between clients and talent." };
+  return { ok: false, error: "Only the admin can message every client and developer." };
 }
 
 export async function startConversation(otherUserId: string) {

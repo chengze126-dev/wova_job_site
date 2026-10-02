@@ -1,3 +1,6 @@
+"use client";
+
+import { useActionState } from "react";
 import type { User } from "@/lib/prisma";
 import { parseSkills } from "@/lib/constants";
 import { parseExtras } from "@/lib/profile-extras";
@@ -13,15 +16,19 @@ const fieldClass =
 export function ProfileSettingsForm({ profile }: { profile: User }) {
   const extras = parseExtras(profile.extras);
   const skills = parseSkills(profile.skills || "");
+  const [state, action] = useActionState(updateProfileBasics, null);
 
   return (
-    <form action={updateProfileBasics} className="mt-5 space-y-4">
+    <form action={action} className="mt-5 space-y-4">
+      {state?.error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>
+      ) : null}
       <AvatarInput personName={profile.name} currentSrc={profile.avatarUrl} required={!profile.avatarUrl} />
       <label className="block text-sm">
         Name
         <input name="name" defaultValue={profile.name} className={fieldClass} />
       </label>
-      <LocationInput defaultCity={extras.city} defaultCountry={profile.country} required />
+      <LocationInput defaultCity={extras.city} defaultCountry={profile.country} />
       <PhoneInput defaultPhone={profile.phone} defaultCountry={profile.country} />
       <label className="block text-sm">
         Title

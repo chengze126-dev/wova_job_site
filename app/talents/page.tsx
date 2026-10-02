@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { TalentBadge } from "@/components/badges";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { parseSkills } from "@/lib/constants";
+import { COUNTRIES, parseSkills } from "@/lib/constants";
 import { formatHourly } from "@/lib/utils";
 import { formatLocation, skillOverlap, textMatchesQuery } from "@/lib/geo";
 import { parseExtras } from "@/lib/profile-extras";
@@ -13,11 +13,12 @@ import { parseExtras } from "@/lib/profile-extras";
 export default async function TalentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; job?: string }>;
+  searchParams: Promise<{ q?: string; name?: string; job?: string; country?: string; skills?: string; badge?: string }>;
 }) {
   const params = await searchParams;
   const viewer = await getCurrentUser();
-  if (viewer?.role === "TALENT") redirect("/jobs");
+  if (!viewer) redirect("/login?next=/talents");
+  if (viewer.role === "TALENT") redirect("/jobs");
   const talents = await prisma.user.findMany({
     where: { role: "TALENT", onboardingDone: true },
     orderBy: [{ talentBadge: "desc" }, { name: "asc" }],
@@ -31,42 +32,68 @@ export default async function TalentsPage({
       : [];
   const selectedJob = clientJobs.find((job) => job.id === params.job);
   const jobSkills = selectedJob ? parseSkills(selectedJob.skills || "") : [];
-  const query = params.q?.trim() || "";
+  const nameQuery = (params.name || params.q || "").trim();
+  const countryQuery = (params.country || "").trim();
+  const skillQuery = parseSkills(params.skills || "");
+  const badgeQuery = (params.badge || "").trim();
 
   const filtered = talents
     .map((talent) => {
       const extras = parseExtras(talent.extras);
       const skills = parseSkills(talent.skills || "");
       const matches = skillOverlap(jobSkills, skills);
-      const haystack = `${talent.name} ${talent.title || ""} ${talent.bio || ""} ${skills.join(" ")} ${extras.city || ""} ${talent.country || ""}`;
-      return { talent, extras, skills, matches, haystack };
+      const skillHits = skillOverlap(skillQuery, skills);
+      return { talent, extras, skills, matches, skillHits };
     })
-    .filter((item) => (query ? textMatchesQuery(item.haystack, query) : true))
+    .filter((item) =>
+      nameQuery
+        ? textMatchesQuery(`${item.talent.name} ${item.talent.title || ""}`, nameQuery)
+        : true,
+    )
+    .filter((item) => (countryQuery ? item.talent.country === countryQuery : true))
+    .filter((item) => (skillQuery.length ? item.skillHits.length > 0 : true))
+    .filter((item) => {
+      if (badgeQuery === "tested") return Boolean(item.talent.talentBadge || item.talent.skillTestPassed);
+      if (badgeQuery === "untested") return !item.talent.talentBadge && !item.talent.skillTestPassed;
+      return true;
+    })
     .filter((item) => (jobSkills.length ? item.matches.length > 0 : true))
-    .sort((a, b) => b.matches.length - a.matches.length);
+    .sort((a, b) => b.matches.length - a.matches.length || b.skillHits.length - a.skillHits.length);
+
+  const fieldClass = "w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none";
 
   return (
     <div className="bg-paper-2 pb-16 pt-10">
       <div className="mx-auto w-[92%] max-w-[1080px]">
         <h1 className="text-[32px] font-semibold tracking-[-0.03em] text-ink">Talent</h1>
         <p className="mt-2 text-muted">
-          Browse developer profiles. Clients can search by skill or by one of their open jobs, then send a direct
+          Browse developer profiles. Search by name, country, skills, or skill-tested status, then send a direct
           message. Talent can reply after a contract starts.
         </p>
 
-        <form className="mt-6 grid gap-3 rounded-[12px] border border-line bg-cream p-4 sm:grid-cols-[1fr_auto]">
+        <form className="mt-6 grid gap-3 rounded-[12px] border border-line bg-cream p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <input name="name" defaultValue={nameQuery} placeholder="Search by name" className={fieldClass} />
+          <select name="country" defaultValue={countryQuery} className={fieldClass} aria-label="Country">
+            <option value="">All countries</option>
+            {COUNTRIES.map((country) => (
+              <option key={country} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
           <input
-            name="q"
-            defaultValue={params.q}
-            placeholder="Search by name, title, or skill (React, Python…)"
-            className="w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none"
+            name="skills"
+            defaultValue={params.skills || ""}
+            placeholder="Skills (React, Python…)"
+            className={fieldClass}
           />
+          <select name="badge" defaultValue={badgeQuery} className={fieldClass} aria-label="Skill tested">
+            <option value="">All skill-test states</option>
+            <option value="tested">Skill tested</option>
+            <option value="untested">Not skill tested</option>
+          </select>
           {clientJobs.length ? (
-            <select
-              name="job"
-              defaultValue={params.job || ""}
-              className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
-            >
+            <select name="job" defaultValue={params.job || ""} className={`${fieldClass} sm:col-span-2`}>
               <option value="">All open jobs</option>
               {clientJobs.map((job) => (
                 <option key={job.id} value={job.id}>
@@ -75,7 +102,7 @@ export default async function TalentsPage({
               ))}
             </select>
           ) : null}
-          <button className="rounded-xl bg-[#0db64b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0aa542] sm:col-start-2">
+          <button className="rounded-xl bg-[#0db64b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0aa542] sm:col-span-2 lg:col-span-4">
             Search
           </button>
         </form>

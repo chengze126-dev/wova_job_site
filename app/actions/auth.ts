@@ -17,6 +17,7 @@ import {
   readSignupSnapshot,
   rememberSignup,
   restoreUserFromSnapshot,
+  snapshotFromUser,
   toSessionUser,
 } from "@/lib/auth";
 import { COMPANY_SIZES, COUNTRIES, INDUSTRIES, parseSkills } from "@/lib/constants";
@@ -114,15 +115,7 @@ export async function loginUser(formData: FormData) {
   }
 
   try {
-    await rememberSignup({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      country: user.country,
-      passwordHash: user.passwordHash,
-      emailVerified: user.emailVerified,
-    });
+    await rememberSignup(snapshotFromUser(user));
     await createSession(toSessionUser(user), { remember });
   } catch (error) {
     if (error instanceof Error && error.message.includes("AUTH_SECRET")) {
@@ -137,7 +130,7 @@ export async function loginUser(formData: FormData) {
   }
   if (!user.onboardingDone && user.role !== "ADMIN") redirect("/onboarding");
   if (user.role === "ADMIN") redirect("/admin");
-  if (user.role === "TALENT") redirect("/dashboard");
+  if (user.role === "TALENT") redirect(`/profile/${user.id}`);
   redirect("/");
 }
 
@@ -200,15 +193,7 @@ export async function completeOAuthSignIn({
   });
   const next = await prisma.user.findUnique({ where: { id: user.id } });
   if (!next) throw new Error("Could not finish social sign-in.");
-  await rememberSignup({
-    id: next.id,
-    email: next.email,
-    name: next.name,
-    role: next.role,
-    country: next.country,
-    passwordHash: next.passwordHash,
-    emailVerified: true,
-  });
+  await rememberSignup(snapshotFromUser({ ...next, emailVerified: true }));
   await createSession(toSessionUser({ ...next, emailVerified: true }));
   continueAfterAuth({ ...next, emailVerified: true });
 }
@@ -286,7 +271,7 @@ export async function resetPassword(formData: FormData) {
 
 export async function logoutUser() {
   await destroySession();
-  redirect("/");
+  redirect("/login");
 }
 
 export async function completeTalentOnboarding(formData: FormData) {
@@ -368,6 +353,8 @@ export async function completeTalentOnboarding(formData: FormData) {
       ...(country ? { country } : {}),
     },
   });
+  const saved = await prisma.user.findUnique({ where: { id: user.id } });
+  if (saved) await rememberSignup(snapshotFromUser(saved));
 
   redirect(`/profile/${user.id}`);
 }
@@ -404,6 +391,14 @@ export async function completeClientOnboarding(formData: FormData) {
       ...(country ? { country } : {}),
     },
   });
+  const saved = await prisma.user.findUnique({ where: { id: user.id } });
+  if (saved) {
+    try {
+      await rememberSignup(snapshotFromUser(saved));
+    } catch {
+      /* snapshot cookie is best-effort */
+    }
+  }
 
   redirect("/dashboard");
 }
@@ -455,11 +450,19 @@ export async function updateProfile(formData: FormData) {
   }
 
   await prisma.user.update({ where: { id: user.id }, data });
+  const saved = await prisma.user.findUnique({ where: { id: user.id } });
+  if (saved) {
+    try {
+      await rememberSignup(snapshotFromUser(saved));
+    } catch {
+      /* snapshot cookie is best-effort */
+    }
+  }
   revalidatePath("/profile");
   revalidatePath("/profile/settings");
   revalidatePath(`/profile/${user.id}`);
   revalidatePath("/talents");
-  redirect("/profile/settings");
+  redirect(user.role === "TALENT" ? `/profile/${user.id}` : "/profile/settings");
 }
 
 function randomOtp() {
@@ -472,11 +475,11 @@ function authSecret() {
   return new TextEncoder().encode(value);
 }
 
-function continueAfterAuth(user: { role: string; onboardingDone: boolean; emailVerified?: boolean }) {
+function continueAfterAuth(user: { id?: string; role: string; onboardingDone: boolean; emailVerified?: boolean }) {
   if (!user.emailVerified && user.role !== "ADMIN") redirect("/verify-email");
   if (!user.onboardingDone && user.role !== "ADMIN") redirect("/onboarding");
   if (user.role === "ADMIN") redirect("/admin");
-  if (user.role === "TALENT") redirect("/dashboard");
+  if (user.role === "TALENT") redirect(user.id ? `/profile/${user.id}` : "/profile");
   redirect("/");
 }
 
@@ -540,6 +543,7 @@ async function markEmailVerified(user: {
   name: string;
   role: string;
   onboardingDone?: boolean;
+  country?: string | null;
 }) {
   try {
     await prisma.user.update({
@@ -571,19 +575,23 @@ async function markEmailVerified(user: {
   const snapshot = await readSignupSnapshot();
   const passwordHash = persisted?.passwordHash || snapshot?.passwordHash || "";
   if (passwordHash) {
-    await rememberSignup({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      country: persisted?.country ?? snapshot?.country ?? null,
-      passwordHash,
-      emailVerified: true,
-    });
+    await rememberSignup(
+      snapshotFromUser({
+        ...(persisted || user),
+        passwordHash,
+        emailVerified: true,
+        country: persisted?.country ?? snapshot?.country ?? user.country ?? null,
+      }),
+    );
   }
   await clearVerifyCookies();
   await createSession(toSessionUser({ ...user, emailVerified: true }));
-  continueAfterAuth({ role: user.role, onboardingDone: Boolean(user.onboardingDone), emailVerified: true });
+  continueAfterAuth({
+    id: user.id,
+    role: user.role,
+    onboardingDone: Boolean(user.onboardingDone),
+    emailVerified: true,
+  });
 }
 
 async function issueEmailVerification(userId: string) {
@@ -747,7 +755,7 @@ export async function consumeEmailVerifyToken(token: string) {
         role: role as "ADMIN" | "CLIENT" | "TALENT",
         emailVerified: true,
       });
-      continueAfterAuth({ role, onboardingDone: false, emailVerified: true });
+      continueAfterAuth({ id, role, onboardingDone: false, emailVerified: true });
     }
     await markEmailVerified({
       id: user.id,
@@ -815,5 +823,5 @@ export async function verifyPhoneOtp(formData: FormData) {
 
   revalidatePath("/profile");
   revalidatePath(`/profile/${user.id}`);
-  redirect("/dashboard");
+  redirect(user.role === "TALENT" ? `/profile/${user.id}` : "/dashboard");
 }

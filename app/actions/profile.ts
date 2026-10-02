@@ -3,21 +3,68 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect, RedirectType } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getCurrentUser, rememberSignup, snapshotFromUser } from "@/lib/auth";
+import { prisma, type User } from "@/lib/prisma";
 import { parseSkills } from "@/lib/constants";
 import { parseExtras, stringifyExtras, type ProfileExtras } from "@/lib/profile-extras";
 import { savePublicUpload } from "@/lib/uploads";
 
+async function persistUser(user: User, data: Record<string, unknown>) {
+  const existing = await prisma.user.findUnique({ where: { id: user.id } });
+  const saved = existing
+    ? await prisma.user.update({ where: { id: user.id }, data })
+    : await prisma.user.create({
+        data: {
+          id: user.id,
+          email: user.email,
+          passwordHash: user.passwordHash,
+          role: user.role,
+          name: user.name,
+          country: user.country,
+          phone: user.phone,
+          phoneVerified: user.phoneVerified,
+          emailVerified: user.emailVerified,
+          bio: user.bio,
+          linkedinUrl: user.linkedinUrl,
+          resumeUrl: user.resumeUrl,
+          avatarUrl: user.avatarUrl,
+          title: user.title,
+          hourlyRate: user.hourlyRate,
+          skills: user.skills,
+          extras: user.extras,
+          skillTestPassed: user.skillTestPassed,
+          talentBadge: user.talentBadge,
+          connects: user.connects,
+          onboardingDone: user.onboardingDone,
+          companyName: user.companyName,
+          companySize: user.companySize,
+          companyIndustry: user.companyIndustry,
+          companyWebsite: user.companyWebsite,
+          companyLocation: user.companyLocation,
+          paymentConnected: user.paymentConnected,
+          ...data,
+        },
+      });
+  if (!saved) throw new Error("Could not save profile.");
+  try {
+    await rememberSignup(snapshotFromUser(saved));
+  } catch {
+    /* snapshot cookie is best-effort */
+  }
+  return saved;
+}
+
 async function saveExtras(userId: string, extras: ProfileExtras) {
-  await prisma.user.update({ where: { id: userId }, data: { extras: stringifyExtras(extras) } });
+  const user = await getCurrentUser();
+  if (!user || user.id !== userId) return;
+  await persistUser(user, { extras: stringifyExtras(extras) });
   revalidatePath("/profile");
   revalidatePath("/profile/settings");
   revalidatePath(`/profile/${userId}`);
   revalidatePath("/talents");
 }
 
-export async function updateProfileBasics(formData: FormData) {
+export async function updateProfileBasics(_prev: { error?: string } | null, formData: FormData) {
   const user = await getCurrentUser();
   if (!user || user.role !== "TALENT") return { error: "Sign in as talent first." };
 
@@ -82,12 +129,12 @@ export async function updateProfileBasics(formData: FormData) {
     return { error: "Upload a profile photo." };
   }
 
-  await prisma.user.update({ where: { id: user.id }, data });
+  await persistUser(user, data);
   revalidatePath("/profile");
   revalidatePath("/profile/settings");
   revalidatePath(`/profile/${user.id}`);
   revalidatePath("/talents");
-  redirect("/profile/settings", RedirectType.replace);
+  redirect(`/profile/${user.id}`, RedirectType.replace);
 }
 
 export async function toggleAvailableNow() {

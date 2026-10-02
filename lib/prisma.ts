@@ -1,77 +1,56 @@
-import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "crypto";
-import fs from "fs";
-import path from "path";
 import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
 import { ADMIN_EMAIL, ADMIN_ID, ADMIN_NAME, adminPassword } from "./admin";
 import { hashSync } from "bcryptjs";
-import { dataDirectory, isVercelProduction } from "./paths";
+import { isVercelProduction } from "./paths";
 import { marketplaceJobs } from "../prisma/marketplace-data";
-
-type Dict = Record<string, unknown>;
+import { getSql, usesRemoteDatabase, type Dict, type SqlDatabase } from "./sql";
 
 const globalForDb = globalThis as unknown as {
-  hirelineDb?: DatabaseSync;
   hirelineSeeded?: boolean;
+  hirelineMigrated?: boolean;
   hirelineSeedPromise?: Promise<void>;
 };
 
-function dataDir() {
-  return dataDirectory();
-}
-
-function demoDbPath() {
-  return path.join(process.cwd(), "data", "demo.db");
-}
-
-function openSqlite(file: string) {
-  const instance = new DatabaseSync(file);
-  instance.exec("PRAGMA foreign_keys = ON;");
-  migrate(instance);
+async function db() {
+  const instance = await getSql();
+  if (!globalForDb.hirelineMigrated) {
+    await migrate(instance);
+    globalForDb.hirelineMigrated = true;
+  }
   return instance;
 }
 
-function userCount(instance: DatabaseSync) {
-  const row = instance.prepare("SELECT COUNT(*) AS c FROM User").get() as { c: number } | undefined;
+async function qget(sql: string, ...params: unknown[]) {
+  return (await db()).prepare(sql).get(...params);
+}
+
+async function qall(sql: string, ...params: unknown[]) {
+  return (await db()).prepare(sql).all(...params);
+}
+
+async function qrun(sql: string, ...params: unknown[]) {
+  await (await db()).prepare(sql).run(...params);
+}
+
+async function qexec(sql: string) {
+  await (await db()).exec(sql);
+}
+
+async function userCount() {
+  const row = await qget("SELECT COUNT(*) AS c FROM User");
   return Number(row?.c ?? 0);
-}
-
-function db() {
-  if (globalForDb.hirelineDb) {
-    ensureSkillAttemptLiveColumns(globalForDb.hirelineDb);
-    return globalForDb.hirelineDb;
-  }
-  const dir = dataDir();
-  fs.mkdirSync(dir, { recursive: true });
-  const dest = path.join(dir, "hireline.db");
-  const seedFile = demoDbPath();
-  if (!isVercelProduction() && !fs.existsSync(dest) && fs.existsSync(seedFile)) {
-    fs.copyFileSync(seedFile, dest);
-  }
-  let instance = openSqlite(dest);
-  if (
-    !isVercelProduction() &&
-    userCount(instance) === 0 &&
-    fs.existsSync(seedFile) &&
-    path.resolve(seedFile) !== path.resolve(dest)
-  ) {
-    instance.close();
-    fs.copyFileSync(seedFile, dest);
-    instance = openSqlite(dest);
-  }
-  globalForDb.hirelineDb = instance;
-  return instance;
 }
 
 async function ensureDemoSeed() {
   if (globalForDb.hirelineSeeded) return;
-  if (isVercelProduction()) {
+  if (isVercelProduction() || usesRemoteDatabase()) {
     globalForDb.hirelineSeeded = true;
     return;
   }
-  if (userCount(db()) > 0) {
+  if ((await userCount()) > 0) {
     globalForDb.hirelineSeeded = true;
     return;
   }
@@ -92,17 +71,15 @@ async function ensureDemoSeed() {
   await globalForDb.hirelineSeedPromise;
 }
 
-function ensureCodingQuestions(instance: DatabaseSync) {
-  const row = instance.prepare("SELECT COUNT(*) AS c FROM SkillQuestion WHERE kind = 'code'").get() as
-    | { c: number }
-    | undefined;
+async function ensureCodingQuestions(instance: SqlDatabase) {
+  const row = await instance.prepare("SELECT COUNT(*) AS c FROM SkillQuestion WHERE kind = 'code'").get();
   if (row && Number(row.c) > 0) return;
 
   const stmt = instance.prepare(
     "INSERT INTO SkillQuestion (id, prompt, options, correctIndex, category, kind, starterCode, functionName, tests) VALUES (?,?,?,?,?,?,?,?,?)",
   );
   for (const item of CODING_QUESTIONS.map(toCodeQuestionRow)) {
-    stmt.run(
+    await stmt.run(
       randomUUID(),
       item.prompt,
       item.options,
@@ -116,8 +93,8 @@ function ensureCodingQuestions(instance: DatabaseSync) {
   }
 }
 
-function migrate(instance: DatabaseSync) {
-  instance.exec(`
+async function migrate(instance: SqlDatabase) {
+  await instance.exec(`
     CREATE TABLE IF NOT EXISTS User (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -243,53 +220,30 @@ function migrate(instance: DatabaseSync) {
       FOREIGN KEY (talentId) REFERENCES User(id) ON DELETE CASCADE
     );
   `);
-  try {
-    instance.exec("ALTER TABLE User ADD COLUMN country TEXT");
-  } catch {
-    // column already exists
-  }
-  for (const column of ["jobType TEXT NOT NULL DEFAULT 'Full-time'", "duration TEXT NOT NULL DEFAULT '1–3 months'"]) {
+  async function addColumn(sql: string) {
     try {
-      instance.exec(`ALTER TABLE Job ADD COLUMN ${column}`);
+      await instance.exec(sql);
     } catch {
       // column already exists
     }
   }
-  const jobMeta = instance.prepare("UPDATE Job SET jobType = ?, duration = ? WHERE title = ?");
-  for (const item of marketplaceJobs) {
-    jobMeta.run(jobTypeFromTitle(item.title), jobDurationFromTitle(item.title), item.title);
+  await addColumn("ALTER TABLE User ADD COLUMN country TEXT");
+  for (const column of ["jobType TEXT NOT NULL DEFAULT 'Full-time'", "duration TEXT NOT NULL DEFAULT '1–3 months'"]) {
+    await addColumn(`ALTER TABLE Job ADD COLUMN ${column}`);
   }
-  try {
-    instance.exec("ALTER TABLE Application ADD COLUMN attachmentUrl TEXT");
-  } catch {
-    // column already exists
+  if (instance.kind === "local") {
+    const jobMeta = instance.prepare("UPDATE Job SET jobType = ?, duration = ? WHERE title = ?");
+    for (const item of marketplaceJobs) {
+      await jobMeta.run(jobTypeFromTitle(item.title), jobDurationFromTitle(item.title), item.title);
+    }
   }
-  try {
-    instance.exec("ALTER TABLE Application ADD COLUMN attachmentName TEXT");
-  } catch {
-    // column already exists
-  }
-  try {
-    instance.exec("ALTER TABLE SkillQuestion ADD COLUMN kind TEXT NOT NULL DEFAULT 'mcq'");
-  } catch {
-    // column already exists
-  }
-  try {
-    instance.exec("ALTER TABLE SkillQuestion ADD COLUMN starterCode TEXT");
-  } catch {
-    // column already exists
-  }
-  try {
-    instance.exec("ALTER TABLE SkillQuestion ADD COLUMN functionName TEXT");
-  } catch {
-    // column already exists
-  }
-  try {
-    instance.exec("ALTER TABLE SkillQuestion ADD COLUMN tests TEXT");
-  } catch {
-    // column already exists
-  }
-  ensureSkillAttemptLiveColumns(instance);
+  await addColumn("ALTER TABLE Application ADD COLUMN attachmentUrl TEXT");
+  await addColumn("ALTER TABLE Application ADD COLUMN attachmentName TEXT");
+  await addColumn("ALTER TABLE SkillQuestion ADD COLUMN kind TEXT NOT NULL DEFAULT 'mcq'");
+  await addColumn("ALTER TABLE SkillQuestion ADD COLUMN starterCode TEXT");
+  await addColumn("ALTER TABLE SkillQuestion ADD COLUMN functionName TEXT");
+  await addColumn("ALTER TABLE SkillQuestion ADD COLUMN tests TEXT");
+  await ensureSkillAttemptLiveColumns(instance);
   for (const column of [
     "avatarUrl TEXT",
     "title TEXT",
@@ -300,59 +254,48 @@ function migrate(instance: DatabaseSync) {
     "emailOtpHash TEXT",
     "emailOtpExpires TEXT",
   ]) {
-    try {
-      instance.exec(`ALTER TABLE User ADD COLUMN ${column}`);
-    } catch {
-      // column already exists
-    }
+    await addColumn(`ALTER TABLE User ADD COLUMN ${column}`);
   }
   try {
-    instance.exec("UPDATE User SET emailVerified = 1 WHERE onboardingDone = 1");
+    await instance.exec("UPDATE User SET emailVerified = 1 WHERE onboardingDone = 1");
   } catch {
     // column missing on a brand-new empty file
   }
-  instance
-    .prepare(
+  if (instance.kind === "local") {
+    const avatarFill = instance.prepare(
       `UPDATE User SET avatarUrl=?, title=?, hourlyRate=?, skills=? WHERE email=? AND (avatarUrl IS NULL OR avatarUrl='')`,
-    )
-    .run(
+    );
+    await avatarFill.run(
       "/avatars/maya.jpg",
       "Product Designer & Front-End Engineer",
       75,
       JSON.stringify(["React", "Figma", "TypeScript", "UI design"]),
       "maya@talent.test",
     );
-  instance
-    .prepare(
-      `UPDATE User SET avatarUrl=?, title=?, hourlyRate=?, skills=? WHERE email=? AND (avatarUrl IS NULL OR avatarUrl='')`,
-    )
-    .run(
+    await avatarFill.run(
       "/avatars/diego.jpg",
       "Full-Stack TypeScript Developer",
       85,
       JSON.stringify(["Next.js", "Node.js", "PostgreSQL", "Payments"]),
       "diego@talent.test",
     );
-  instance
-    .prepare(
-      `UPDATE User SET avatarUrl=?, title=?, hourlyRate=?, skills=? WHERE email=? AND (avatarUrl IS NULL OR avatarUrl='')`,
-    )
-    .run(
+    await avatarFill.run(
       "/avatars/coder.jpg",
       "JavaScript Developer",
       40,
       JSON.stringify(["JavaScript", "Algorithms", "HTML", "CSS"]),
       "coder@talent.test",
     );
-  const extrasFill = instance.prepare("UPDATE User SET extras=? WHERE email=? AND (extras IS NULL OR extras='')");
-  for (const [email, extras] of Object.entries(DEMO_EXTRAS)) {
-    extrasFill.run(stringifyExtras(extras), email);
+    const extrasFill = instance.prepare("UPDATE User SET extras=? WHERE email=? AND (extras IS NULL OR extras='')");
+    for (const [email, extras] of Object.entries(DEMO_EXTRAS)) {
+      await extrasFill.run(stringifyExtras(extras), email);
+    }
   }
-  ensureCodingQuestions(instance);
-  ensureAdminUser(instance);
+  await ensureCodingQuestions(instance);
+  await ensureAdminUser(instance);
 }
 
-function ensureSkillAttemptLiveColumns(instance: DatabaseSync) {
+async function ensureSkillAttemptLiveColumns(instance: SqlDatabase) {
   for (const column of [
     "cameraOn INTEGER NOT NULL DEFAULT 0",
     "lastHeartbeat TEXT",
@@ -361,23 +304,21 @@ function ensureSkillAttemptLiveColumns(instance: DatabaseSync) {
     "stackName TEXT",
   ]) {
     try {
-      instance.exec(`ALTER TABLE SkillAttempt ADD COLUMN ${column}`);
+      await instance.exec(`ALTER TABLE SkillAttempt ADD COLUMN ${column}`);
     } catch {
       // column already exists
     }
   }
 }
 
-function ensureAdminUser(instance: DatabaseSync) {
+async function ensureAdminUser(instance: SqlDatabase) {
   const createdAt = now();
-  instance.prepare("DELETE FROM User WHERE role = 'ADMIN' AND lower(email) != ?").run(ADMIN_EMAIL);
+  await instance.prepare("DELETE FROM User WHERE role = 'ADMIN' AND lower(email) != ?").run(ADMIN_EMAIL);
   const password = adminPassword();
-  const existing = instance.prepare("SELECT id FROM User WHERE lower(email) = ?").get(ADMIN_EMAIL) as
-    | { id: string }
-    | undefined;
+  const existing = await instance.prepare("SELECT id FROM User WHERE lower(email) = ?").get(ADMIN_EMAIL);
   if (!password) {
     if (existing) {
-      instance
+      await instance
         .prepare(`UPDATE User SET role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`)
         .run(ADMIN_NAME, createdAt, existing.id);
     }
@@ -385,14 +326,14 @@ function ensureAdminUser(instance: DatabaseSync) {
   }
   const passwordHash = hashSync(password, 10);
   if (existing) {
-    instance
+    await instance
       .prepare(
         `UPDATE User SET passwordHash=?, role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`,
       )
       .run(passwordHash, ADMIN_NAME, createdAt, existing.id);
     return;
   }
-  instance
+  await instance
     .prepare(
       `INSERT INTO User (
         id, email, passwordHash, role, name, phoneVerified, emailVerified, onboardingDone, createdAt, updatedAt, connects
@@ -549,8 +490,8 @@ function mapApplication(row: Dict) {
   };
 }
 
-function getUserById(userId: string) {
-  const row = db().prepare("SELECT * FROM User WHERE id = ?").get(userId) as Dict | undefined;
+async function getUserById(userId: string) {
+  const row = await qget("SELECT * FROM User WHERE id = ?", userId);
   return row ? mapUser(row) : null;
 }
 
@@ -594,9 +535,9 @@ export const prisma = {
   user: {
     async findUnique({ where }: { where: Dict }) {
       await ensureDemoSeed();
-      if (where.id) return getUserById(String(where.id));
+      if (where.id) return await getUserById(String(where.id));
       if (where.email) {
-        const row = db().prepare("SELECT * FROM User WHERE email = ?").get(where.email) as Dict | undefined;
+        const row = await qget("SELECT * FROM User WHERE email = ?", where.email) as Dict | undefined;
         return row ? mapUser(row) : null;
       }
       return null;
@@ -608,29 +549,22 @@ export const prisma = {
       const extra =
         orderBy?.talentBadge === "desc" ? "talentBadge DESC, name ASC" : order;
       const sql = `SELECT * FROM User ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${extra}`;
-      return (db().prepare(sql).all(...params) as Dict[]).map(mapUser);
+      return (await qall(sql, ...params) as Dict[]).map(mapUser);
     },
     async count({ where = {} }: { where?: Dict } = {}) {
       await ensureDemoSeed();
       const { clauses, params } = userWhereSql(where);
-      const row = db()
-        .prepare(`SELECT COUNT(*) as c FROM User ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`)
-        .get(...params) as Dict;
+      const row = await qget(`SELECT COUNT(*) as c FROM User ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`, ...params) as Dict;
       return Number(row.c);
     },
     async create({ data }: { data: Dict }) {
       const userId = String(data.id ?? id());
       const createdAt = now();
-      db()
-        .prepare(
-          `INSERT INTO User (
+      await qrun(`INSERT INTO User (
             id, email, passwordHash, role, name, country, phone, phoneVerified, emailVerified, bio, createdAt, updatedAt,
             linkedinUrl, resumeUrl, avatarUrl, title, hourlyRate, skills, extras, skillTestPassed, talentBadge, connects, onboardingDone,
             companyName, companySize, companyIndustry, companyWebsite, companyLocation, paymentConnected
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          userId,
+          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, userId,
           data.email,
           data.passwordHash,
           data.role,
@@ -658,12 +592,11 @@ export const prisma = {
           data.companyIndustry ?? null,
           data.companyWebsite ?? null,
           data.companyLocation ?? null,
-          toBool(data.paymentConnected),
-        );
-      return getUserById(userId)!;
+          toBool(data.paymentConnected),);
+      return (await getUserById(userId))!;
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      const current = getUserById(where.id);
+      const current = await getUserById(where.id);
       if (!current) throw new Error("User not found");
       const next = {
         ...current,
@@ -679,18 +612,13 @@ export const prisma = {
         emailOtpExpires: data.emailOtpExpires === undefined ? current.emailOtpExpires : data.emailOtpExpires,
         updatedAt: new Date(),
       };
-      db()
-        .prepare(
-          `UPDATE User SET
+      await qrun(`UPDATE User SET
             name=?, country=?, phone=?, phoneVerified=?, phoneOtpHash=?, phoneOtpExpires=?,
             emailVerified=?, emailOtpHash=?, emailOtpExpires=?, bio=?, updatedAt=?,
             linkedinUrl=?, resumeUrl=?, avatarUrl=?, title=?, hourlyRate=?, skills=?, extras=?, skillTestPassed=?, talentBadge=?, connects=?, onboardingDone=?,
             companyName=?, companySize=?, companyIndustry=?, companyWebsite=?, companyLocation=?,
             stripeCustomerId=?, paymentConnected=?
-          WHERE id=?`,
-        )
-        .run(
-          next.name,
+          WHERE id=?`, next.name,
           next.country,
           next.phone,
           toBool(next.phoneVerified),
@@ -719,27 +647,28 @@ export const prisma = {
           next.companyLocation,
           next.stripeCustomerId,
           toBool(next.paymentConnected),
-          where.id,
-        );
-      return getUserById(where.id);
+          where.id,);
+      return await getUserById(where.id);
     },
     async deleteMany() {
-      db().exec("DELETE FROM User");
+      await qexec("DELETE FROM User");
     },
   },
   job: {
     async findUnique({ where, include }: { where: { id: string }; include?: Dict }) {
-      const row = db().prepare("SELECT * FROM Job WHERE id = ?").get(where.id) as Dict | undefined;
+      const row = await qget("SELECT * FROM Job WHERE id = ?", where.id) as Dict | undefined;
       if (!row) return null;
       const job = mapJob(row);
-      const client = include?.client ? getUserById(job.clientId) : undefined;
+      const client = include?.client ? await getUserById(job.clientId) : undefined;
       let applications;
       if (include?.applications) {
-        const appRows = db().prepare("SELECT * FROM Application WHERE jobId = ? ORDER BY createdAt DESC").all(job.id) as Dict[];
-        applications = appRows.map((app) => ({
-          ...mapApplication(app),
-          talent: getUserById(String(app.talentId)),
-        }));
+        const appRows = await qall("SELECT * FROM Application WHERE jobId = ? ORDER BY createdAt DESC", job.id) as Dict[];
+        applications = await Promise.all(
+          appRows.map(async (app) => ({
+            ...mapApplication(app),
+            talent: await getUserById(String(app.talentId)),
+          })),
+        );
       }
       return { ...job, client, applications };
     },
@@ -788,21 +717,21 @@ export const prisma = {
       }
       const order = orderBy?.createdAt === "desc" || !orderBy ? "createdAt DESC" : "createdAt ASC";
       const limit = take ? ` LIMIT ${Number(take)}` : "";
-      const rows = db()
-        .prepare(`SELECT * FROM Job ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${order}${limit}`)
-        .all(...params) as Dict[];
-      return rows.map((row) => {
+      const rows = await qall(`SELECT * FROM Job ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${order}${limit}`, ...params) as Dict[];
+      return Promise.all(
+        rows.map(async (row) => {
         const job = mapJob(row);
-        const client = include?.client ? getUserById(job.clientId) : undefined;
+        const client = include?.client ? await getUserById(job.clientId) : undefined;
         const count = include?._count
-          ? Number((db().prepare("SELECT COUNT(*) as c FROM Application WHERE jobId = ?").get(job.id) as Dict).c)
+          ? Number((await qget("SELECT COUNT(*) as c FROM Application WHERE jobId = ?", job.id) as Dict).c)
           : undefined;
         return {
           ...job,
           client,
           _count: count === undefined ? undefined : { applications: count },
         };
-      });
+      }),
+      );
     },
     async count({ where = {} }: { where?: Dict } = {}) {
       await ensureDemoSeed();
@@ -819,20 +748,13 @@ export const prisma = {
           params.push(status);
         }
       }
-      const row = db()
-        .prepare(`SELECT COUNT(*) as c FROM Job ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`)
-        .get(...params) as Dict;
+      const row = await qget(`SELECT COUNT(*) as c FROM Job ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}`, ...params) as Dict;
       return Number(row.c);
     },
     async create({ data }: { data: Dict }) {
       const jobId = String(data.id ?? id());
-      db()
-        .prepare(
-          `INSERT INTO Job (id, title, description, category, skills, budgetMin, budgetMax, budgetType, jobType, duration, highBadge, connectCost, status, clientId, createdAt)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          jobId,
+      await qrun(`INSERT INTO Job (id, title, description, category, skills, budgetMin, budgetMax, budgetType, jobType, duration, highBadge, connectCost, status, clientId, createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, jobId,
           data.title,
           data.description,
           data.category,
@@ -846,19 +768,18 @@ export const prisma = {
           Number(data.connectCost ?? 10),
           data.status ?? "OPEN",
           data.clientId,
-          data.createdAt ? new Date(data.createdAt as string | Date).toISOString() : now(),
-        );
+          data.createdAt ? new Date(data.createdAt as string | Date).toISOString() : now(),);
       return this.findUnique({ where: { id: jobId }, include: { client: true } });
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      const current = db().prepare("SELECT * FROM Job WHERE id = ?").get(where.id) as Dict | undefined;
+      const current = await qget("SELECT * FROM Job WHERE id = ?", where.id) as Dict | undefined;
       if (!current) throw new Error("Job not found");
       const status = data.status ?? current.status;
-      db().prepare("UPDATE Job SET status = ? WHERE id = ?").run(status, where.id);
+      await qrun("UPDATE Job SET status = ? WHERE id = ?", status, where.id);
       return mapJob({ ...current, status });
     },
     async deleteMany() {
-      db().exec("DELETE FROM Job");
+      await qexec("DELETE FROM Job");
     },
   },
   application: {
@@ -892,11 +813,7 @@ export const prisma = {
         });
         clauses.push(`(${orParts.join(" OR ")})`);
       }
-      const row = db()
-        .prepare(
-          `SELECT * FROM Application ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} LIMIT 1`,
-        )
-        .get(...params) as Dict | undefined;
+      const row = await qget(`SELECT * FROM Application ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} LIMIT 1`, ...params) as Dict | undefined;
       if (!row) return null;
       const app = mapApplication(row);
       if (select) {
@@ -910,19 +827,17 @@ export const prisma = {
     },
     async findUnique({ where, include }: { where: Dict; include?: Dict }) {
       let row: Dict | undefined;
-      if (where.id) row = db().prepare("SELECT * FROM Application WHERE id = ?").get(where.id) as Dict | undefined;
+      if (where.id) row = await qget("SELECT * FROM Application WHERE id = ?", where.id) as Dict | undefined;
       if (where.jobId_talentId) {
         const pair = where.jobId_talentId as Dict;
-        row = db()
-          .prepare("SELECT * FROM Application WHERE jobId = ? AND talentId = ?")
-          .get(pair.jobId, pair.talentId) as Dict | undefined;
+        row = await qget("SELECT * FROM Application WHERE jobId = ? AND talentId = ?", pair.jobId, pair.talentId) as Dict | undefined;
       }
       if (!row) return null;
       const app = mapApplication(row);
       return {
         ...app,
         job: include?.job ? await prisma.job.findUnique({ where: { id: app.jobId } }) : undefined,
-        talent: include?.talent ? getUserById(app.talentId) : undefined,
+        talent: include?.talent ? await getUserById(app.talentId) : undefined,
       };
     },
     async findMany({ where = {}, include, orderBy, take }: { where?: Dict; include?: Dict; orderBy?: Dict; take?: number } = {}) {
@@ -938,27 +853,20 @@ export const prisma = {
       }
       const order = orderBy?.createdAt === "desc" || !orderBy ? "createdAt DESC" : "createdAt ASC";
       const limit = take ? `LIMIT ${Number(take)}` : "";
-      const rows = db()
-        .prepare(`SELECT * FROM Application ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${order} ${limit}`)
-        .all(...params) as Dict[];
+      const rows = await qall(`SELECT * FROM Application ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${order} ${limit}`, ...params) as Dict[];
       return Promise.all(
         rows.map(async (row) => {
           const app = mapApplication(row);
           const job = include?.job ? await prisma.job.findUnique({ where: { id: app.jobId }, include: { client: true } }) : undefined;
-          const talent = include?.talent ? getUserById(app.talentId) : undefined;
+          const talent = include?.talent ? await getUserById(app.talentId) : undefined;
           return { ...app, job, talent };
         }),
       );
     },
     async create({ data }: { data: Dict }) {
       const appId = id();
-      db()
-        .prepare(
-          `INSERT INTO Application (id, jobId, talentId, coverLetter, connectsUsed, status, attachmentUrl, attachmentName, createdAt)
-           VALUES (?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          appId,
+      await qrun(`INSERT INTO Application (id, jobId, talentId, coverLetter, connectsUsed, status, attachmentUrl, attachmentName, createdAt)
+           VALUES (?,?,?,?,?,?,?,?,?)`, appId,
           data.jobId,
           data.talentId,
           data.coverLetter,
@@ -966,27 +874,24 @@ export const prisma = {
           data.status ?? "PENDING",
           data.attachmentUrl ?? null,
           data.attachmentName ?? null,
-          data.createdAt ? new Date(data.createdAt as string | Date).toISOString() : now(),
-        );
-      return mapApplication(db().prepare("SELECT * FROM Application WHERE id = ?").get(appId) as Dict);
+          data.createdAt ? new Date(data.createdAt as string | Date).toISOString() : now(),);
+      return mapApplication(await qget("SELECT * FROM Application WHERE id = ?", appId) as Dict);
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      db().prepare("UPDATE Application SET status = ? WHERE id = ?").run(data.status, where.id);
+      await qrun("UPDATE Application SET status = ? WHERE id = ?", data.status, where.id);
       return this.findUnique({ where: { id: where.id } });
     },
     async deleteMany() {
-      db().exec("DELETE FROM Application");
+      await qexec("DELETE FROM Application");
     },
   },
   conversation: {
     async findUnique({ where, include }: { where: Dict; include?: Dict }) {
       let row: Dict | undefined;
-      if (where.id) row = db().prepare("SELECT * FROM Conversation WHERE id = ?").get(where.id) as Dict | undefined;
+      if (where.id) row = await qget("SELECT * FROM Conversation WHERE id = ?", where.id) as Dict | undefined;
       if (where.userAId_userBId) {
         const pair = where.userAId_userBId as Dict;
-        row = db()
-          .prepare("SELECT * FROM Conversation WHERE userAId = ? AND userBId = ?")
-          .get(pair.userAId, pair.userBId) as Dict | undefined;
+        row = await qget("SELECT * FROM Conversation WHERE userAId = ? AND userBId = ?", pair.userAId, pair.userBId) as Dict | undefined;
       }
       if (!row) return null;
       const convo = {
@@ -996,15 +901,15 @@ export const prisma = {
         createdAt: new Date(String(row.createdAt)),
         updatedAt: new Date(String(row.updatedAt)),
       };
-      const userA = include?.userA ? getUserById(convo.userAId) : undefined;
-      const userB = include?.userB ? getUserById(convo.userBId) : undefined;
+      const userA = include?.userA ? await getUserById(convo.userAId) : undefined;
+      const userB = include?.userB ? await getUserById(convo.userBId) : undefined;
       let messages;
       if (include?.messages) {
         const take = (include.messages as Dict).take as number | undefined;
         const order = (include.messages as Dict).orderBy as Dict | undefined;
         const dir = order?.createdAt === "asc" ? "ASC" : "DESC";
         const sql = `SELECT * FROM Message WHERE conversationId = ? ORDER BY createdAt ${dir} ${take ? `LIMIT ${take}` : ""}`;
-        messages = (db().prepare(sql).all(convo.id) as Dict[]).map((m) => ({
+        messages = (await qall(sql, convo.id) as Dict[]).map((m) => ({
           id: String(m.id),
           conversationId: String(m.conversationId),
           senderId: String(m.senderId),
@@ -1016,16 +921,10 @@ export const prisma = {
     },
     async findMany({ where, include, orderBy }: { where?: Dict; include?: Dict; orderBy?: Dict } = {}) {
       const or = (where?.OR as Dict[]) || [];
-      const rows = db()
-        .prepare(
-          `SELECT * FROM Conversation ${or.length ? "WHERE userAId = ? OR userBId = ?" : ""} ORDER BY updatedAt DESC`,
-        )
-        .all(...(or.length ? [or[0].userAId || or[1].userAId, or[0].userBId || or[1].userBId] : [])) as Dict[];
+      const rows = await qall(`SELECT * FROM Conversation ${or.length ? "WHERE userAId = ? OR userBId = ?" : ""} ORDER BY updatedAt DESC`, ...(or.length ? [or[0].userAId || or[1].userAId, or[0].userBId || or[1].userBId] : [])) as Dict[];
       const userId = or[0]?.userAId || or[0]?.userBId;
       const filtered = userId
-        ? (db()
-            .prepare("SELECT * FROM Conversation WHERE userAId = ? OR userBId = ? ORDER BY updatedAt DESC")
-            .all(userId, userId) as Dict[])
+        ? (await qall("SELECT * FROM Conversation WHERE userAId = ? OR userBId = ? ORDER BY updatedAt DESC", userId, userId) as Dict[])
         : rows;
       void orderBy;
       return Promise.all(filtered.map((row) => this.findUnique({ where: { id: row.id }, include })));
@@ -1033,41 +932,33 @@ export const prisma = {
     async create({ data }: { data: Dict }) {
       const convoId = id();
       const createdAt = now();
-      db()
-        .prepare("INSERT INTO Conversation (id, userAId, userBId, createdAt, updatedAt) VALUES (?,?,?,?,?)")
-        .run(convoId, data.userAId, data.userBId, createdAt, createdAt);
+      await qrun("INSERT INTO Conversation (id, userAId, userBId, createdAt, updatedAt) VALUES (?,?,?,?,?)", convoId, data.userAId, data.userBId, createdAt, createdAt);
       return this.findUnique({ where: { id: convoId } });
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      db()
-        .prepare("UPDATE Conversation SET updatedAt = ? WHERE id = ?")
-        .run(data.updatedAt ? new Date(data.updatedAt as Date).toISOString() : now(), where.id);
+      await qrun("UPDATE Conversation SET updatedAt = ? WHERE id = ?", data.updatedAt ? new Date(data.updatedAt as Date).toISOString() : now(), where.id);
       return this.findUnique({ where });
     },
     async deleteMany() {
-      db().exec("DELETE FROM Conversation");
+      await qexec("DELETE FROM Conversation");
     },
   },
   message: {
     async create({ data }: { data: Dict }) {
       const messageId = id();
-      db()
-        .prepare("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)")
-        .run(messageId, data.conversationId, data.senderId, data.content, now());
+      await qrun("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)", messageId, data.conversationId, data.senderId, data.content, now());
       return { id: messageId, ...data, createdAt: new Date() };
     },
     async deleteMany() {
-      db().exec("DELETE FROM Message");
+      await qexec("DELETE FROM Message");
     },
   },
   skillQuestion: {
     async findMany({ where }: { where?: Dict } = {}) {
       const ids = where?.id && (where.id as Dict).in ? ((where.id as Dict).in as string[]) : null;
       const rows = ids
-        ? (db()
-            .prepare(`SELECT * FROM SkillQuestion WHERE id IN (${ids.map(() => "?").join(",")})`)
-            .all(...ids) as Dict[])
-        : (db().prepare("SELECT * FROM SkillQuestion").all() as Dict[]);
+        ? (await qall(`SELECT * FROM SkillQuestion WHERE id IN (${ids.map(() => "?").join(",")})`, ...ids) as Dict[])
+        : (await qall("SELECT * FROM SkillQuestion") as Dict[]);
       return rows.map((row) => ({
         id: String(row.id),
         prompt: String(row.prompt),
@@ -1081,11 +972,11 @@ export const prisma = {
       }));
     },
     async createMany({ data }: { data: Dict[] }) {
-      const stmt = db().prepare(
+      const stmt = (await db()).prepare(
         "INSERT INTO SkillQuestion (id, prompt, options, correctIndex, category, kind, starterCode, functionName, tests) VALUES (?,?,?,?,?,?,?,?,?)",
       );
       for (const item of data) {
-        stmt.run(
+        await stmt.run(
           id(),
           item.prompt,
           item.options,
@@ -1099,40 +990,33 @@ export const prisma = {
       }
     },
     async deleteMany() {
-      db().exec("DELETE FROM SkillQuestion");
+      await qexec("DELETE FROM SkillQuestion");
     },
   },
   skillAttempt: {
     async findUnique({ where }: { where: { id: string } }) {
-      const row = db().prepare("SELECT * FROM SkillAttempt WHERE id = ?").get(where.id) as Dict | undefined;
+      const row = await qget("SELECT * FROM SkillAttempt WHERE id = ?", where.id) as Dict | undefined;
       if (!row) return null;
       return mapSkillAttempt(row);
     },
     async findMany({ include, orderBy, take, where }: { include?: Dict; orderBy?: Dict; take?: number; where?: Dict } = {}) {
       void orderBy;
       const liveOnly = Boolean(where?.completedAt === null);
-      const rows = db()
-        .prepare(
-          `SELECT ${liveOnly ? "*" : "id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, questionIndex, stackName, answers"}
+      const rows = await qall(`SELECT ${liveOnly ? "*" : "id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, questionIndex, stackName, answers"}
            FROM SkillAttempt
            ${liveOnly ? "WHERE completedAt IS NULL" : ""}
-           ORDER BY startedAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`,
-        )
-        .all() as Dict[];
-      return rows.map((row) => ({
+           ORDER BY startedAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`,) as Dict[];
+      return Promise.all(
+        rows.map(async (row) => ({
         ...mapSkillAttempt(row),
-        talent: include?.talent ? getUserById(String(row.talentId)) : undefined,
-      }));
+        talent: include?.talent ? await getUserById(String(row.talentId)) : undefined,
+      })),
+      );
     },
     async create({ data }: { data: Dict }) {
       const attemptId = id();
-      db()
-        .prepare(
-          `INSERT INTO SkillAttempt (id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, cameraFrame, questionIndex, stackName, answers)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          attemptId,
+      await qrun(`INSERT INTO SkillAttempt (id, talentId, startedAt, completedAt, score, passed, cameraEnabled, cameraOn, lastHeartbeat, cameraFrame, questionIndex, stackName, answers)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, attemptId,
           data.talentId,
           data.startedAt ? new Date(data.startedAt as Date).toISOString() : now(),
           data.completedAt ? new Date(data.completedAt as Date).toISOString() : null,
@@ -1144,8 +1028,7 @@ export const prisma = {
           data.cameraFrame ?? null,
           data.questionIndex ?? 0,
           data.stackName ?? null,
-          data.answers ?? null,
-        );
+          data.answers ?? null,);
       return this.findUnique({ where: { id: attemptId } });
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
@@ -1167,12 +1050,7 @@ export const prisma = {
           : data.lastHeartbeat
             ? new Date(data.lastHeartbeat as Date).toISOString()
             : null;
-      db()
-        .prepare(
-          `UPDATE SkillAttempt SET completedAt=?, score=?, passed=?, cameraEnabled=?, cameraOn=?, lastHeartbeat=?, cameraFrame=?, questionIndex=?, stackName=?, answers=? WHERE id=?`,
-        )
-        .run(
-          completedAt,
+      await qrun(`UPDATE SkillAttempt SET completedAt=?, score=?, passed=?, cameraEnabled=?, cameraOn=?, lastHeartbeat=?, cameraFrame=?, questionIndex=?, stackName=?, answers=? WHERE id=?`, completedAt,
           data.score === undefined ? current.score : data.score,
           data.passed === undefined ? toBool(current.passed) : toBool(data.passed),
           data.cameraEnabled === undefined ? toBool(current.cameraEnabled) : toBool(data.cameraEnabled),
@@ -1182,18 +1060,17 @@ export const prisma = {
           data.questionIndex === undefined ? current.questionIndex : data.questionIndex,
           data.stackName === undefined ? current.stackName : data.stackName,
           data.answers === undefined ? current.answers : data.answers,
-          where.id,
-        );
+          where.id,);
       return this.findUnique({ where });
     },
     async deleteMany() {
-      db().exec("DELETE FROM SkillAttempt");
+      await qexec("DELETE FROM SkillAttempt");
     },
   },
   connectPurchase: {
     async findUnique({ where }: { where: Dict }) {
       const row = where.stripeSessionId
-        ? (db().prepare("SELECT * FROM ConnectPurchase WHERE stripeSessionId = ?").get(where.stripeSessionId) as Dict | undefined)
+        ? (await qget("SELECT * FROM ConnectPurchase WHERE stripeSessionId = ?", where.stripeSessionId) as Dict | undefined)
         : undefined;
       if (!row) return null;
       return {
@@ -1208,11 +1085,7 @@ export const prisma = {
     },
     async findMany({ where, orderBy, take }: { where?: Dict; orderBy?: Dict; take?: number } = {}) {
       void orderBy;
-      const rows = db()
-        .prepare(
-          `SELECT * FROM ConnectPurchase ${where?.talentId ? "WHERE talentId = ?" : ""} ORDER BY createdAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`,
-        )
-        .all(...(where?.talentId ? [where.talentId] : [])) as Dict[];
+      const rows = await qall(`SELECT * FROM ConnectPurchase ${where?.talentId ? "WHERE talentId = ?" : ""} ORDER BY createdAt DESC ${take ? `LIMIT ${Number(take)}` : ""}`, ...(where?.talentId ? [where.talentId] : [])) as Dict[];
       return rows.map((row) => ({
         id: String(row.id),
         talentId: String(row.talentId),
@@ -1225,28 +1098,22 @@ export const prisma = {
     },
     async create({ data }: { data: Dict }) {
       const purchaseId = id();
-      db()
-        .prepare(
-          `INSERT INTO ConnectPurchase (id, talentId, connects, amountCents, stripeSessionId, status, createdAt)
-           VALUES (?,?,?,?,?,?,?)`,
-        )
-        .run(
-          purchaseId,
+      await qrun(`INSERT INTO ConnectPurchase (id, talentId, connects, amountCents, stripeSessionId, status, createdAt)
+           VALUES (?,?,?,?,?,?,?)`, purchaseId,
           data.talentId,
           data.connects,
           data.amountCents,
           data.stripeSessionId ?? null,
           data.status ?? "completed",
-          now(),
-        );
+          now(),);
       return { id: purchaseId, ...data, createdAt: new Date() };
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      db().prepare("UPDATE ConnectPurchase SET status = ? WHERE id = ?").run(data.status, where.id);
+      await qrun("UPDATE ConnectPurchase SET status = ? WHERE id = ?", data.status, where.id);
       return { id: where.id, ...data };
     },
     async deleteMany() {
-      db().exec("DELETE FROM ConnectPurchase");
+      await qexec("DELETE FROM ConnectPurchase");
     },
   },
   async $transaction<T>(ops: Promise<T>[]) {

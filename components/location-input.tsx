@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { COUNTRY_META, countryMeta, formatLocation } from "@/lib/geo";
 
 const fieldClass =
@@ -29,6 +29,13 @@ export function LocationInput({
   const preview = formatLocation(city, country) || `${meta.name}`;
   const listId = `${cityName}-cities`;
 
+  useEffect(() => {
+    if (defaultCountry) setCountry(defaultCountry);
+  }, [defaultCountry]);
+  useEffect(() => {
+    if (defaultCity) setCity(defaultCity);
+  }, [defaultCity]);
+
   return (
     <label className="block text-sm">
       {label} {required ? <span className="text-copper-dark">*</span> : null}
@@ -50,7 +57,7 @@ export function LocationInput({
           name={combinedName ? undefined : cityName}
           value={city}
           onChange={(event) => setCity(event.target.value)}
-          required={required}
+          required={false}
           autoComplete="address-level2"
           list={listId}
           placeholder={`City in ${meta.name}`}

@@ -6,6 +6,8 @@ import { TalentBadge } from "@/components/badges";
 import { formatDate } from "@/lib/utils";
 import { isAdminEmail } from "@/lib/admin";
 import { AdminLiveSkillMonitor } from "@/components/admin-live-skill-monitor";
+import { startConversation } from "@/app/actions/messages";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
@@ -24,7 +26,7 @@ export default async function AdminPage() {
       <p className="text-xs uppercase tracking-[0.24em] text-copper">Owner only</p>
       <h1 className="font-display mt-2 text-4xl">Monitor</h1>
       <p className="mt-2 text-muted">
-        Full view of clients, talents, jobs, and skill tests. {clients.length} clients · {talents.length}{" "}
+        Open any client or developer profile and send a DM. {clients.length} clients · {talents.length}{" "}
         talents · {jobs.length} jobs.
       </p>
 
@@ -41,19 +43,27 @@ export default async function AdminPage() {
                 <th className="p-3">Size</th>
                 <th className="p-3">Payment</th>
                 <th className="p-3">Joined</th>
+                <th className="p-3"></th>
               </tr>
             </thead>
             <tbody>
               {clients.map((c) => (
                 <tr key={c.id} className="border-t border-line/70">
                   <td className="p-3">
-                    {c.name}
+                    <Link href={`/profile/${c.id}`} className="font-medium text-pine hover:underline">
+                      {c.name}
+                    </Link>
                     <div className="text-xs text-muted">{c.email}</div>
                   </td>
                   <td className="p-3">{c.companyName}</td>
                   <td className="p-3">{c.companySize}</td>
                   <td className="p-3">{c.paymentConnected ? "Connected" : "—"}</td>
                   <td className="p-3">{formatDate(c.createdAt)}</td>
+                  <td className="p-3 text-right">
+                    <form action={startConversation.bind(null, c.id)}>
+                      <SubmitButton className="!rounded-full !bg-[#14a800] !px-3 !py-1.5 !text-xs">DM</SubmitButton>
+                    </form>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -73,13 +83,16 @@ export default async function AdminPage() {
                 <th className="p-3">Badge</th>
                 <th className="p-3">Skill test</th>
                 <th className="p-3">Connects</th>
+                <th className="p-3"></th>
               </tr>
             </thead>
             <tbody>
               {talents.map((t) => (
                 <tr key={t.id} className="border-t border-line/70">
                   <td className="p-3">
-                    {t.name}
+                    <Link href={`/profile/${t.id}`} className="font-medium text-pine hover:underline">
+                      {t.name}
+                    </Link>
                     <div className="text-xs text-muted">{t.email}</div>
                   </td>
                   <td className="p-3">
@@ -92,6 +105,11 @@ export default async function AdminPage() {
                   <td className="p-3">{t.talentBadge ? <TalentBadge compact /> : "—"}</td>
                   <td className="p-3">{t.skillTestPassed ? "Passed" : "Not passed"}</td>
                   <td className="p-3">{t.connects}</td>
+                  <td className="p-3 text-right">
+                    <form action={startConversation.bind(null, t.id)}>
+                      <SubmitButton className="!rounded-full !bg-[#14a800] !px-3 !py-1.5 !text-xs">DM</SubmitButton>
+                    </form>
+                  </td>
                 </tr>
               ))}
             </tbody>

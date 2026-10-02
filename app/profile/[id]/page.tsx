@@ -15,10 +15,17 @@ export default async function PublicProfilePage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const profile = await prisma.user.findUnique({ where: { id } });
-  if (!profile || profile.role === "ADMIN") notFound();
   const viewer = await getCurrentUser();
+  let profile = await prisma.user.findUnique({ where: { id } });
+  if (!profile && viewer?.id === id) profile = viewer;
+  if (!profile || profile.role === "ADMIN") notFound();
   const isSelf = viewer?.id === profile.id;
+  const canView =
+    isSelf ||
+    viewer?.role === "ADMIN" ||
+    (viewer?.role === "CLIENT" && profile.role === "TALENT") ||
+    (viewer?.role === "TALENT" && profile.role === "CLIENT");
+  if (!canView) notFound();
 
   if (profile.role === "TALENT") {
     const work = await prisma.application.findMany({
@@ -31,6 +38,7 @@ export default async function PublicProfilePage({
       <TalentProfile
         profile={profile}
         viewerId={viewer?.id}
+        viewerRole={viewer?.role}
         work={work}
         publicView={query.view === "public" && isSelf}
         canMessage={canMessage}
@@ -63,11 +71,13 @@ export default async function PublicProfilePage({
           Profile settings
         </Link>
       ) : null}
-      <p className="mt-8 text-sm">
-        <Link href="/talents" className="underline decoration-copper/40">
-          All talents
-        </Link>
-      </p>
+      {viewer?.role !== "TALENT" ? (
+        <p className="mt-8 text-sm">
+          <Link href="/talents" className="underline decoration-copper/40">
+            All talents
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

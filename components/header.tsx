@@ -68,7 +68,7 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
 
         <div className={`ml-auto hidden items-center gap-3 text-[13px] font-medium md:flex lg:gap-5 ${onDark ? "text-white/95" : ""}`}>
           <ThemeToggle onDark={onDark} />
-          {user?.role === "CLIENT" ? (
+          {user?.role === "CLIENT" || user?.role === "ADMIN" ? (
             <Link
               href="/talents"
               className="rounded-[7px] border border-line px-[14px] py-[9px] font-semibold text-header-fg transition hover:border-[#0db64b] hover:text-[#0db64b]"
@@ -132,7 +132,7 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
                 {link.label}
               </Link>
             ))}
-            {user?.role === "CLIENT" ? (
+            {user?.role === "CLIENT" || user?.role === "ADMIN" ? (
               <Link
                 href="/talents"
                 onClick={() => setOpen(false)}

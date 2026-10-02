@@ -598,9 +598,13 @@ export const prisma = {
     async update({ where, data }: { where: { id: string }; data: Dict }) {
       const current = await getUserById(where.id);
       if (!current) throw new Error("User not found");
+      const patch: Dict = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined) patch[key] = value;
+      }
       const next = {
         ...current,
-        ...data,
+        ...patch,
         phoneVerified: data.phoneVerified === undefined ? current.phoneVerified : Boolean(data.phoneVerified),
         emailVerified: data.emailVerified === undefined ? current.emailVerified : Boolean(data.emailVerified),
         skillTestPassed: data.skillTestPassed === undefined ? current.skillTestPassed : Boolean(data.skillTestPassed),

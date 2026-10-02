@@ -151,17 +151,17 @@ export async function completeOAuthSignIn({
     user = await prisma.user.create({
       data: {
         email,
-        name: profile.name,
+        name: profile.name || "New user",
         passwordHash: await hash(randomBytes(24).toString("hex"), 10),
         role: accountRole,
         country: "United States",
         connects: 0,
         emailVerified: true,
-        avatarUrl: profile.avatarUrl || undefined,
+        avatarUrl: profile.avatarUrl || null,
         linkedinUrl:
           profile.provider === "linkedin" && profile.profileUrl?.includes("linkedin.com/in/")
             ? profile.profileUrl
-            : undefined,
+            : null,
       },
     });
   }
@@ -174,15 +174,18 @@ export async function completeOAuthSignIn({
   if (profile.provider === "linkedin") extras.linkedinId = profile.id;
   if (profile.provider === "google") extras.googleId = profile.id;
 
+  const nextAvatar = user.avatarUrl || profile.avatarUrl || null;
+  const nextLinkedin =
+    user.linkedinUrl ||
+    (profile.provider === "linkedin" && profile.profileUrl?.includes("linkedin.com/in/") ? profile.profileUrl : null);
+
   await prisma.user.update({
     where: { id: user.id },
     data: {
       emailVerified: true,
       extras: stringifyExtras(extras),
-      avatarUrl: user.avatarUrl || profile.avatarUrl || undefined,
-      linkedinUrl:
-        user.linkedinUrl ||
-        (profile.provider === "linkedin" && profile.profileUrl?.includes("linkedin.com/in/") ? profile.profileUrl : undefined),
+      ...(nextAvatar ? { avatarUrl: nextAvatar } : {}),
+      ...(nextLinkedin ? { linkedinUrl: nextLinkedin } : {}),
     },
   });
   const next = await prisma.user.findUnique({ where: { id: user.id } });

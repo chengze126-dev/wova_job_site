@@ -17,6 +17,30 @@ export type SqlDatabase = {
   prepare(sql: string): SqlStatement;
 };
 
+type SqlValue = string | number | bigint | Uint8Array | null;
+
+function toSqlValue(value: unknown): SqlValue {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  if (typeof value === "string" || typeof value === "bigint") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function toSqlArgs(params: unknown[]) {
+  return params.map(toSqlValue);
+}
+
 const globalForSql = globalThis as unknown as {
   wovaSql?: SqlDatabase;
   wovaSqlOpening?: Promise<SqlDatabase>;
@@ -55,15 +79,18 @@ function wrapSqlite(instance: DatabaseSync): SqlDatabase {
       const stmt = instance.prepare(sql);
       return {
         async get(...params: unknown[]) {
-          const row = (params.length ? stmt.get(...params) : stmt.get()) as Dict | undefined;
+          const args = toSqlArgs(params);
+          const row = (args.length ? stmt.get(...args) : stmt.get()) as Dict | undefined;
           return row;
         },
         async all(...params: unknown[]) {
-          const rows = (params.length ? stmt.all(...params) : stmt.all()) as Dict[];
+          const args = toSqlArgs(params);
+          const rows = (args.length ? stmt.all(...args) : stmt.all()) as Dict[];
           return rows;
         },
         async run(...params: unknown[]) {
-          if (params.length) stmt.run(...params);
+          const args = toSqlArgs(params);
+          if (args.length) stmt.run(...args);
           else stmt.run();
         },
       };
@@ -104,16 +131,16 @@ async function openTurso(): Promise<SqlDatabase> {
     prepare(sql: string) {
       return {
         async get(...params: unknown[]) {
-          const result = await client.execute({ sql, args: params as never });
+          const result = await client.execute({ sql, args: toSqlArgs(params) });
           const row = result.rows[0];
           return row ? rowToDict(row as unknown as Record<string, unknown>) : undefined;
         },
         async all(...params: unknown[]) {
-          const result = await client.execute({ sql, args: params as never });
+          const result = await client.execute({ sql, args: toSqlArgs(params) });
           return result.rows.map((row) => rowToDict(row as unknown as Record<string, unknown>));
         },
         async run(...params: unknown[]) {
-          await client.execute({ sql, args: params as never });
+          await client.execute({ sql, args: toSqlArgs(params) });
         },
       };
     },

@@ -44,7 +44,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
     redirect("/onboarding");
   } catch (caught) {
     unstable_rethrow(caught);
-    const message = caught instanceof Error ? caught.message : "Could not finish social sign-in.";
+    const raw = caught instanceof Error ? caught.message : "";
+    const message =
+      raw && raw.length < 180 && !/unsupported type of value/i.test(raw)
+        ? raw
+        : "Could not finish social sign-in. Try again.";
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
   }
 }

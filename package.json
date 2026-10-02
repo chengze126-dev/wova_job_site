@@ -14,7 +14,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "tsx prisma/seed.ts",
     "db:turso": "node scripts/push-schema.mjs",
-    "db:admin": "node scripts/push-admin.mjs"
+    "db:admin": "node scripts/push-admin.mjs",
+    "db:jobs": "node scripts/push-jobs.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

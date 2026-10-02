@@ -13,7 +13,7 @@ const features = [
   { title: "Helpful Resources", body: "Career guidance", Icon: BookOpenText },
 ];
 
-export function HomeHero({ user, openJobCount }: { user: SessionUser | null; openJobCount: number }) {
+export function HomeHero({ user }: { user: SessionUser | null }) {
   preload("/hero-european-match.png", { as: "image" });
   return (
     <>
@@ -23,7 +23,7 @@ export function HomeHero({ user, openJobCount }: { user: SessionUser | null; ope
             <div className="absolute inset-0 overflow-hidden">
               <HeroPhoto className="origin-top scale-[1.3]" />
             </div>
-            <ActiveJobsCard count={openJobCount} className="absolute left-[-8px] top-[78px] w-[168px]" />
+            <ActiveJobsCard className="absolute left-[-8px] top-[78px] w-[168px]" />
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export function HomeHero({ user, openJobCount }: { user: SessionUser | null; ope
 
         <div className="relative h-[280px] overflow-hidden lg:hidden">
           <HeroPhoto className="origin-top scale-[1.28]" />
-          <ActiveJobsCard count={openJobCount} className="absolute left-[4%] top-[28px] w-[148px]" />
+          <ActiveJobsCard className="absolute left-[4%] top-[28px] w-[148px]" />
         </div>
       </section>
 
@@ -132,14 +132,14 @@ function HeroPhoto({ className }: { className: string }) {
   );
 }
 
-function ActiveJobsCard({ count, className }: { count: number; className?: string }) {
+function ActiveJobsCard({ className }: { className?: string }) {
   return (
     <div
       className={`rounded-[16px] bg-[#111827] px-[16px] py-[13px] shadow-[0_16px_36px_rgba(0,0,0,0.4)] ${className ?? ""}`}
     >
       <p className="flex items-center gap-2 text-[20px] font-bold tracking-[-0.03em] text-white">
         <span className="h-[8px] w-[8px] rounded-full bg-[#10b981]" />
-        {count.toLocaleString("en-US")}
+        8,888
       </p>
       <p className="mt-[3px] text-[13px] text-white">Active Jobs</p>
       <svg className="mt-[10px] h-[20px] w-full" viewBox="0 0 132 20" fill="none" aria-hidden>

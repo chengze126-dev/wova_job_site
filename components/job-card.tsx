@@ -41,29 +41,40 @@ export function JobCard({
   const duration = job.duration || jobDurationFromTitle(job.title);
 
   if (compact) {
+    const company = job.client?.companyName || job.client?.name || "Hiring on Wova";
+    const location = job.client?.companyLocation || "Remote";
     return (
       <Link
         href={`/jobs/${job.id}`}
-        className="group grid min-h-[94px] grid-cols-[minmax(0,1fr)_20px] items-center gap-3 border-b border-line px-3 py-[12px] last:border-b-0 hover:bg-paper-2/70 sm:px-[16px]"
+        className="group grid min-h-[118px] grid-cols-[minmax(0,1fr)_20px] items-start gap-3 border-b border-line px-3 py-[14px] last:border-b-0 hover:bg-paper-2/70 sm:px-[18px]"
       >
         <div className="min-w-0">
-          <h3 className="truncate text-[14px] font-semibold leading-tight text-ink group-hover:text-[#15803d]">
-            {job.title}
-          </h3>
-          <p className="mt-1 text-[12px] font-semibold text-ink">{budget}</p>
-          <p className="mt-0.5 text-[10px] font-medium text-[#16b64a]">{jobType}</p>
-          <p className="mt-0.5 text-[9px] text-muted">{duration}</p>
-          <p className="mt-0.5 text-[9px] text-muted">{formatDate(job.createdAt)}</p>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
-            {skills.slice(0, 3).map((skill) => (
-              <span key={skill} className="shrink-0 rounded-full bg-paper-2 px-2 py-[2px] text-[9px] leading-none text-muted">
-                {skill}
-              </span>
-            ))}
+          <div className="flex items-start gap-3">
+            <CompanyMark name={company} />
+            <div className="min-w-0">
+              <h3 className="truncate text-[15px] font-semibold leading-tight text-ink group-hover:text-[#15803d]">
+                {job.title}
+              </h3>
+              <p className="mt-1 truncate text-[12px] text-muted">
+                {company} · {location}
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-ink">{budget}</p>
+              <p className="mt-0.5 text-[11px] font-medium text-[#16b64a]">
+                {jobType} · {duration}
+              </p>
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+                {skills.slice(0, 3).map((skill) => (
+                  <span key={skill} className="shrink-0 rounded-full bg-paper-2 px-2 py-[3px] text-[10px] leading-none text-muted">
+                    {skill}
+                  </span>
+                ))}
+                {job.highBadge ? <HighBadge cost={job.connectCost} /> : null}
+              </div>
+            </div>
           </div>
         </div>
 
-        <span className="text-muted transition group-hover:text-[#16b64a]" aria-hidden="true">
+        <span className="mt-1 text-muted transition group-hover:text-[#16b64a]" aria-hidden="true">
           <BookmarkIcon />
         </span>
       </Link>
@@ -100,5 +111,24 @@ function BookmarkIcon() {
     <svg width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M3.25 2.25h9.5v13l-4.75-3-4.75 3v-13Z" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function CompanyMark({ name }: { name: string }) {
+  const hue = [...name].reduce((sum, char) => sum + char.charCodeAt(0) * 13, 0) % 360;
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+  return (
+    <span
+      className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[12px] font-bold text-white"
+      style={{ background: `hsl(${hue} 42% 38%)` }}
+      aria-hidden
+    >
+      {initials || "W"}
+    </span>
   );
 }

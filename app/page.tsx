@@ -8,19 +8,35 @@ import { getSession } from "@/lib/auth";
 
 const referenceBrands = ["Google", "Microsoft", "Amazon", "Stripe", "Notion", "HubSpot"];
 
+function pickFeaturedJobs<T extends { category: string; highBadge: boolean }>(jobs: T[], take: number) {
+  const unique: T[] = [];
+  const used = new Set<string>();
+  for (const job of jobs) {
+    if (unique.length >= take) break;
+    if (used.has(job.category)) continue;
+    used.add(job.category);
+    unique.push(job);
+  }
+  for (const job of jobs) {
+    if (unique.length >= take) break;
+    if (!unique.includes(job)) unique.push(job);
+  }
+  return unique.sort((a, b) => Number(b.highBadge) - Number(a.highBadge));
+}
+
 export default async function HomePage() {
   const session = await getSession();
-  const openJobCount = await prisma.job.count({ where: { status: "OPEN" } });
-  const jobs = await prisma.job.findMany({
+  const openJobs = await prisma.job.findMany({
     where: { status: "OPEN" },
     include: { client: true, _count: { select: { applications: true } } },
     orderBy: { createdAt: "desc" },
-    take: 4,
+    take: 16,
   });
+  const jobs = pickFeaturedJobs(openJobs, 4);
 
   return (
     <div className="bg-paper" data-home>
-      <HomeHero user={session} openJobCount={openJobCount} />
+      <HomeHero user={session} />
 
       <section id="companies" className="mx-auto w-[92%] max-w-[1308px] pb-[22px] pt-[24px]">
         <div className="flex items-center justify-between gap-3">
@@ -37,7 +53,15 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto w-[92%] max-w-[1308px] pb-[48px] pt-[1px]">
-        <h2 className="text-[18px] font-bold tracking-[-0.025em] text-ink">Recommended Jobs</h2>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-[18px] font-bold tracking-[-0.025em] text-ink">Recommended Jobs</h2>
+            <p className="mt-1 text-[13px] text-muted">Fresh briefs from companies hiring on Wova this week.</p>
+          </div>
+          <Link href="/jobs" className="shrink-0 text-[11px] font-semibold text-[#16a34a] hover:underline">
+            View all jobs →
+          </Link>
+        </div>
 
         <div className="mt-[13px] grid items-stretch gap-[36px] lg:grid-cols-[minmax(0,1fr)_295px]">
           <div className="overflow-hidden rounded-[11px] border border-line bg-cream shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
@@ -126,7 +150,38 @@ function BrandMark({ name }: { name: string }) {
 }
 
 function EmptyJobs() {
-  return <div className="flex min-h-[252px] items-center justify-center px-6 text-center text-[13px] text-muted">New opportunities will appear here as soon as employers publish them.</div>;
+  const highlights = [
+    { href: "/jobs?q=React", title: "React & TypeScript", detail: "$45–75 / hr · Contract" },
+    { href: "/jobs?q=Design", title: "Product design", detail: "$2.2k–3.4k · Design systems" },
+    { href: "/jobs?q=Data", title: "Data & finance ops", detail: "$3.5k–6.8k · Dashboards" },
+    { href: "/jobs?q=Writing", title: "B2B writing", detail: "$2.4k–3.6k · Case studies" },
+  ];
+  return (
+    <div className="px-5 py-6 sm:px-6">
+      <p className="text-[13px] font-semibold text-ink">Roles people apply to first</p>
+      <p className="mt-1 text-[12px] text-muted">Engineering, design, data, and writing briefs from companies on Wova.</p>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {highlights.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="rounded-[10px] border border-line bg-paper px-4 py-3 transition hover:border-[#16a34a]/40"
+          >
+            <p className="text-[13px] font-semibold text-ink">{item.title}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{item.detail}</p>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/jobs" className="rounded-[7px] bg-[#0db64b] px-4 py-2 text-[12px] font-semibold text-white hover:bg-[#0aa542]">
+          Browse jobs
+        </Link>
+        <Link href="/jobs/new" className="rounded-[7px] border border-line px-4 py-2 text-[12px] font-semibold text-ink hover:bg-paper-2">
+          Post a job
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function BellIcon() {

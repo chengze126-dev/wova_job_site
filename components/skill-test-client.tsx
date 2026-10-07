@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSkillQuestions, pingSkillTest, submitSkillTest, type SkillQuestionView } from "@/app/actions/skill-test";
 import { SKILL_TIME_MINUTES } from "@/lib/constants";
 import { PROBLEMS_PER_STACK, QUESTIONS_PER_TEST, SKILL_STACKS } from "@/lib/skill-stacks";
+import { IntroVideoRecorder } from "@/components/intro-video-recorder";
 
 function captureFrame(video: HTMLVideoElement | null) {
   if (!video || video.readyState < 2) return null;
@@ -16,11 +17,22 @@ function captureFrame(video: HTMLVideoElement | null) {
   return canvas.toDataURL("image/jpeg", 0.42);
 }
 
-export function SkillTestClient() {
+export function SkillTestClient({
+  introVideoUrl,
+  introVideoSeconds,
+}: {
+  introVideoUrl?: string | null;
+  introVideoSeconds?: number | null;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const attemptIdRef = useRef<string | null>(null);
   const indexRef = useRef(0);
+  const [intro, setIntro] = useState({
+    url: introVideoUrl || "",
+    seconds: introVideoSeconds || 0,
+  });
+  const [recordingIntro, setRecordingIntro] = useState(!introVideoUrl);
   const [stack, setStack] = useState(SKILL_STACKS[0]?.slug ?? "javascript");
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -64,11 +76,13 @@ export function SkillTestClient() {
   }
 
   useEffect(() => {
+    if (recordingIntro || !intro.url) return;
     void enableCamera();
     return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingIntro, intro.url]);
 
   useEffect(() => {
     if (!attemptId) return;
@@ -164,6 +178,22 @@ export function SkillTestClient() {
   const selected = SKILL_STACKS.find((item) => item.slug === stack);
   const cameraBlocked = Boolean(attemptId) && !cameraOn;
 
+  if (recordingIntro || !intro.url) {
+    return (
+      <div className="mt-8 rounded-2xl border border-line bg-cream p-6">
+        <IntroVideoRecorder
+          existingUrl={intro.url || null}
+          existingSeconds={intro.seconds || null}
+          onSaved={(payload) => {
+            setIntro(payload);
+            setRecordingIntro(false);
+          }}
+          onCancel={intro.url ? () => setRecordingIntro(false) : undefined}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="relative mt-8">
       <div className="rounded-2xl border border-line bg-cream p-6">
@@ -194,9 +224,24 @@ export function SkillTestClient() {
               on for {SKILL_TIME_MINUTES} minutes so an admin can watch your test. Pass at 70% to earn the
               Talent badge.
             </p>
+            <p className="mt-2 text-sm text-pine">
+              English introduction saved ({Math.floor(intro.seconds / 60)}:{String(intro.seconds % 60).padStart(2, "0")}
+              ). Admin can watch it.
+            </p>
             {cameraError ? <p className="mt-3 text-sm text-copper-dark">{cameraError}</p> : null}
             {error ? <p className="mt-3 text-sm text-copper-dark">{error}</p> : null}
             <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  streamRef.current?.getTracks().forEach((track) => track.stop());
+                  setCameraOn(false);
+                  setRecordingIntro(true);
+                }}
+                className="rounded-full border border-ink/20 px-5 py-2.5 text-sm"
+              >
+                Re-record intro
+              </button>
               <button
                 type="button"
                 onClick={() => void enableCamera()}

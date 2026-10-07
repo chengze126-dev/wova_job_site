@@ -17,8 +17,9 @@ export default function PrivacyPage() {
         </p>
         <h2 className="text-[20px] font-semibold text-ink">What we collect</h2>
         <p>
-          Account details, profile photos and resumes you upload, messages, payment records from Stripe, and
-          during skill tests a live camera snapshot used so an admin can monitor the session.
+          Account details, profile photos and resumes you upload, messages, payment records from Stripe, a live
+          camera snapshot during skill tests so an admin can monitor the session, and an English introduction
+          video recorded before a skill test.
         </p>
         <h2 className="text-[20px] font-semibold text-ink">How we use it</h2>
         <p>

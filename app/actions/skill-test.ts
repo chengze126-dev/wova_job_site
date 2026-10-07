@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { SKILL_PASS_SCORE } from "@/lib/constants";
+import { INTRO_MAX_SECONDS, INTRO_MIN_SECONDS, SKILL_PASS_SCORE } from "@/lib/constants";
 import { getStackQuestionById, pickTestQuestions, type SkillMcq } from "@/lib/skill-bank";
 import { getSkillStack, QUESTIONS_PER_TEST } from "@/lib/skill-stacks";
 import { isAdminEmail } from "@/lib/admin";
@@ -63,11 +63,53 @@ function parseQuestionCount(answers: string | null) {
   }
 }
 
+export async function saveSkillIntroVideo(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "TALENT") return { error: "Only developers can record an introduction." };
+
+  const file = formData.get("video");
+  const seconds = Number(formData.get("seconds"));
+  if (!(file instanceof File) || file.size < 40_000) {
+    return { error: "Record a real introduction video first." };
+  }
+  if (file.size > 35 * 1024 * 1024) {
+    return { error: "Keep the video under 35MB. Speak in English for 2–5 minutes." };
+  }
+  if (!Number.isFinite(seconds) || seconds < INTRO_MIN_SECONDS) {
+    return { error: "The introduction must be at least 2 minutes, in English." };
+  }
+  if (seconds > INTRO_MAX_SECONDS + 8) {
+    return { error: "The introduction must be 5 minutes or less." };
+  }
+  const mime = (file.type || "video/webm").toLowerCase();
+  if (!mime.startsWith("video/")) return { error: "Upload a video file." };
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await prisma.introVideo.save({ userId: user.id, buffer });
+  const url = `/api/intro-video/${user.id}`;
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      introVideoUrl: url,
+      introVideoMime: mime,
+      introVideoSeconds: Math.round(seconds),
+      introVideoAt: new Date(),
+    },
+  });
+  revalidatePath("/skill-test");
+  revalidatePath("/admin");
+  revalidatePath(`/profile/${user.id}`);
+  return { ok: true as const, url, seconds: Math.round(seconds) };
+}
+
 export async function getSkillQuestions(stackSlug: string) {
   const user = await getCurrentUser();
   if (!user || user.role !== "TALENT") return { error: "Only talents can take this test." };
   const stack = getSkillStack(stackSlug);
   if (!stack) return { error: "Pick a stack to start." };
+  if (!user.introVideoUrl) {
+    return { error: "Record a 2–5 minute English introduction video before the skill test." };
+  }
 
   const selected = pickTestQuestions(stack.slug, QUESTIONS_PER_TEST);
   if (selected.length < QUESTIONS_PER_TEST) return { error: "Could not load questions for that stack." };

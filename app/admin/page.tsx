@@ -33,6 +33,39 @@ export default async function AdminPage() {
       <AdminLiveSkillMonitor />
 
       <section className="mt-10">
+        <h2 className="font-display text-3xl">Introduction videos</h2>
+        <p className="mt-1 text-sm text-muted">
+          Developers must record a 2–5 minute English introduction before the tech skill test. Watch each video here.
+        </p>
+        {talents.filter((t) => t.introVideoUrl).length === 0 ? (
+          <p className="mt-3 rounded-2xl border border-line bg-cream p-4 text-sm text-muted">
+            No introduction videos yet.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {talents
+              .filter((t) => t.introVideoUrl)
+              .map((t) => (
+                <article key={t.id} className="rounded-2xl border border-line bg-cream p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <Link href={`/profile/${t.id}`} className="font-semibold text-pine hover:underline">
+                        {t.name}
+                      </Link>
+                      <p className="text-xs text-muted">{t.email}</p>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {Math.floor((t.introVideoSeconds || 0) / 60)}:{String((t.introVideoSeconds || 0) % 60).padStart(2, "0")}
+                    </p>
+                  </div>
+                  <video src={t.introVideoUrl || ""} controls preload="metadata" className="mt-3 w-full rounded-xl bg-black" />
+                </article>
+              ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
         <h2 className="font-display text-3xl">Clients</h2>
         <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-cream">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -82,6 +115,7 @@ export default async function AdminPage() {
                 <th className="p-3">LinkedIn / resume</th>
                 <th className="p-3">Badge</th>
                 <th className="p-3">Skill test</th>
+                <th className="p-3">Intro video</th>
                 <th className="p-3">Connects</th>
                 <th className="p-3"></th>
               </tr>
@@ -104,6 +138,23 @@ export default async function AdminPage() {
                   </td>
                   <td className="p-3">{t.talentBadge ? <TalentBadge compact /> : "—"}</td>
                   <td className="p-3">{t.skillTestPassed ? "Passed" : "Not passed"}</td>
+                  <td className="p-3">
+                    {t.introVideoUrl ? (
+                      <div className="w-44">
+                        <video
+                          src={t.introVideoUrl}
+                          controls
+                          preload="metadata"
+                          className="h-24 w-full rounded-lg bg-black"
+                        />
+                        <p className="mt-1 text-[11px] text-muted">
+                          {Math.floor((t.introVideoSeconds || 0) / 60)}:{String((t.introVideoSeconds || 0) % 60).padStart(2, "0")} English intro
+                        </p>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="p-3">{t.connects}</td>
                   <td className="p-3 text-right">
                     <form action={startConversation.bind(null, t.id)}>

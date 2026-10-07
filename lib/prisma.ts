@@ -129,7 +129,11 @@ async function migrate(instance: SqlDatabase) {
       companyWebsite TEXT,
       companyLocation TEXT,
       stripeCustomerId TEXT,
-      paymentConnected INTEGER NOT NULL DEFAULT 0
+      paymentConnected INTEGER NOT NULL DEFAULT 0,
+      introVideoUrl TEXT,
+      introVideoMime TEXT,
+      introVideoSeconds INTEGER,
+      introVideoAt TEXT
     );
     CREATE TABLE IF NOT EXISTS Job (
       id TEXT PRIMARY KEY,
@@ -228,6 +232,22 @@ async function migrate(instance: SqlDatabase) {
     }
   }
   await addColumn("ALTER TABLE User ADD COLUMN country TEXT");
+  for (const column of [
+    "introVideoUrl TEXT",
+    "introVideoMime TEXT",
+    "introVideoSeconds INTEGER",
+    "introVideoAt TEXT",
+  ]) {
+    await addColumn(`ALTER TABLE User ADD COLUMN ${column}`);
+  }
+  await instance.exec(`
+    CREATE TABLE IF NOT EXISTS IntroVideoChunk (
+      userId TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      PRIMARY KEY (userId, seq)
+    );
+  `);
   for (const column of ["jobType TEXT NOT NULL DEFAULT 'Full-time'", "duration TEXT NOT NULL DEFAULT '1–3 months'"]) {
     await addColumn(`ALTER TABLE Job ADD COLUMN ${column}`);
   }
@@ -415,6 +435,10 @@ export type User = {
   companyLocation: string | null;
   stripeCustomerId: string | null;
   paymentConnected: boolean;
+  introVideoUrl: string | null;
+  introVideoMime: string | null;
+  introVideoSeconds: number | null;
+  introVideoAt: Date | null;
 };
 
 function mapUser(row: Dict): User {
@@ -453,6 +477,10 @@ function mapUser(row: Dict): User {
     companyLocation: (row.companyLocation as string) ?? null,
     stripeCustomerId: (row.stripeCustomerId as string) ?? null,
     paymentConnected: asBool(row.paymentConnected),
+    introVideoUrl: (row.introVideoUrl as string) ?? null,
+    introVideoMime: (row.introVideoMime as string) ?? null,
+    introVideoSeconds: row.introVideoSeconds == null || row.introVideoSeconds === "" ? null : Number(row.introVideoSeconds),
+    introVideoAt: toDate(row.introVideoAt),
   };
 }
 
@@ -621,7 +649,7 @@ export const prisma = {
             emailVerified=?, emailOtpHash=?, emailOtpExpires=?, bio=?, updatedAt=?,
             linkedinUrl=?, resumeUrl=?, avatarUrl=?, title=?, hourlyRate=?, skills=?, extras=?, skillTestPassed=?, talentBadge=?, connects=?, onboardingDone=?,
             companyName=?, companySize=?, companyIndustry=?, companyWebsite=?, companyLocation=?,
-            stripeCustomerId=?, paymentConnected=?
+            stripeCustomerId=?, paymentConnected=?, introVideoUrl=?, introVideoMime=?, introVideoSeconds=?, introVideoAt=?
           WHERE id=?`, next.name,
           next.country,
           next.phone,
@@ -651,6 +679,10 @@ export const prisma = {
           next.companyLocation,
           next.stripeCustomerId,
           toBool(next.paymentConnected),
+          next.introVideoUrl ?? null,
+          next.introVideoMime ?? null,
+          next.introVideoSeconds == null ? null : Number(next.introVideoSeconds),
+          next.introVideoAt ? new Date(next.introVideoAt as Date).toISOString() : null,
           where.id,);
       return await getUserById(where.id);
     },
@@ -1118,6 +1150,25 @@ export const prisma = {
     },
     async deleteMany() {
       await qexec("DELETE FROM ConnectPurchase");
+    },
+  },
+  introVideo: {
+    async save({ userId, buffer }: { userId: string; buffer: Buffer }) {
+      await qrun("DELETE FROM IntroVideoChunk WHERE userId = ?", userId);
+      const chunk = 90_000;
+      for (let offset = 0, seq = 0; offset < buffer.length; offset += chunk, seq += 1) {
+        await qrun(
+          "INSERT INTO IntroVideoChunk (userId, seq, data) VALUES (?,?,?)",
+          userId,
+          seq,
+          buffer.subarray(offset, offset + chunk).toString("base64"),
+        );
+      }
+    },
+    async load(userId: string) {
+      const rows = (await qall("SELECT data FROM IntroVideoChunk WHERE userId = ? ORDER BY seq ASC", userId)) as Dict[];
+      if (!rows.length) return null;
+      return Buffer.concat(rows.map((row) => Buffer.from(String(row.data || ""), "base64")));
     },
   },
   async $transaction<T>(ops: Promise<T>[]) {

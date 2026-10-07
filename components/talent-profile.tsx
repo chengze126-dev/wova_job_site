@@ -652,7 +652,8 @@ export function TalentProfile({
               <section className={cardClass}>
                 <h3 className="text-lg font-semibold">Skill test</h3>
                 <p className="mt-2 text-sm text-muted">
-                  Choose a stack and answer 10 problems. Passing adds a Talent badge for high-badge jobs.
+                  Record a 2–5 minute English introduction, then answer 10 problems. Passing adds a Talent badge
+                  for high-badge jobs.
                 </p>
                 <Link href="/skill-test" className="mt-4 inline-flex rounded-full bg-[#14a800] px-4 py-2 text-sm font-semibold text-white">
                   Go to skill testing

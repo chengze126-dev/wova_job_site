@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS User (
   companyWebsite TEXT,
   companyLocation TEXT,
   stripeCustomerId TEXT,
-  paymentConnected INTEGER NOT NULL DEFAULT 0
+  paymentConnected INTEGER NOT NULL DEFAULT 0,
+  introVideoUrl TEXT,
+  introVideoMime TEXT,
+  introVideoSeconds INTEGER,
+  introVideoAt TEXT
 );
 
 CREATE TABLE IF NOT EXISTS Job (
@@ -141,3 +145,10 @@ CREATE INDEX IF NOT EXISTS idx_application_job ON Application(jobId);
 CREATE INDEX IF NOT EXISTS idx_application_talent ON Application(talentId);
 CREATE INDEX IF NOT EXISTS idx_message_conversation ON Message(conversationId);
 CREATE INDEX IF NOT EXISTS idx_skill_attempt_talent ON SkillAttempt(talentId);
+
+CREATE TABLE IF NOT EXISTS IntroVideoChunk (
+  userId TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  PRIMARY KEY (userId, seq)
+);

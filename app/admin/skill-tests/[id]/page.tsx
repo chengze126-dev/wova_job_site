@@ -88,6 +88,22 @@ export default async function AdminSkillTestResultPage({
         ) : null}
       </div>
 
+      {talent?.introVideoUrl ? (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold">English introduction</h2>
+          <p className="mt-1 text-sm text-muted">
+            Required before the tech test
+            {talent.introVideoSeconds
+              ? ` · ${Math.floor(talent.introVideoSeconds / 60)}:${String(talent.introVideoSeconds % 60).padStart(2, "0")}`
+              : ""}
+            .
+          </p>
+          <video src={talent.introVideoUrl} controls preload="metadata" className="mt-4 w-full rounded-2xl bg-black" />
+        </section>
+      ) : (
+        <p className="mt-8 text-sm text-copper-dark">This developer has not recorded an introduction video.</p>
+      )}
+
       {!attempt.completedAt ? (
         <p className="mt-8 text-sm text-muted">This developer has not submitted the test yet.</p>
       ) : review.rows.length === 0 ? (

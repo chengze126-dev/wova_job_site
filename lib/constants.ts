@@ -11,6 +11,8 @@ export const SKILL_QUESTION_COUNT = 10;
 export const SKILL_MCQ_COUNT = 10;
 export const SKILL_CODE_COUNT = 0;
 export const SKILL_TIME_MINUTES = 20;
+export const INTRO_MIN_SECONDS = 120;
+export const INTRO_MAX_SECONDS = 300;
 export const PROBLEMS_PER_STACK = 1000;
 
 export const COMPANY_SIZES = [

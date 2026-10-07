@@ -11,14 +11,14 @@ export default async function SkillTestPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.24em] text-pine">Required camera</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-pine">Required introduction</p>
       <h1 className="font-display mt-2 text-4xl">Skill test</h1>
       <p className="mt-3 max-w-2xl text-muted">
-        Choose one of {SKILL_STACKS.length} main stacks. Each stack has {PROBLEMS_PER_STACK.toLocaleString()}{" "}
-        problems. Every test shows {QUESTIONS_PER_TEST} questions. Your camera must stay on so an admin can
-        watch the test. Pass at 70% and a Talent badge is added next to your photo.
+        Record a 2–5 minute English introduction first. Then choose one of {SKILL_STACKS.length} stacks. Each
+        test shows {QUESTIONS_PER_TEST} questions from {PROBLEMS_PER_STACK.toLocaleString()} problems. Your camera
+        must stay on so an admin can watch. Pass at 70% and a Talent badge is added next to your photo.
       </p>
-      <SkillTestClient />
+      <SkillTestClient introVideoUrl={user.introVideoUrl} introVideoSeconds={user.introVideoSeconds} />
     </div>
   );
 }

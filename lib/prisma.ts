@@ -754,20 +754,30 @@ export const prisma = {
       const order = orderBy?.createdAt === "desc" || !orderBy ? "createdAt DESC" : "createdAt ASC";
       const limit = take ? ` LIMIT ${Number(take)}` : "";
       const rows = await qall(`SELECT * FROM Job ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY ${order}${limit}`, ...params) as Dict[];
-      return Promise.all(
-        rows.map(async (row) => {
-        const job = mapJob(row);
-        const client = include?.client ? await getUserById(job.clientId) : undefined;
-        const count = include?._count
-          ? Number((await qget("SELECT COUNT(*) as c FROM Application WHERE jobId = ?", job.id) as Dict).c)
-          : undefined;
-        return {
-          ...job,
-          client,
-          _count: count === undefined ? undefined : { applications: count },
-        };
-      }),
-      );
+      const jobs = rows.map(mapJob);
+      const clientsById = new Map<string, User>();
+      if (include?.client && jobs.length) {
+        const ids = [...new Set(jobs.map((job) => job.clientId))];
+        const clientRows = (await qall(
+          `SELECT * FROM User WHERE id IN (${ids.map(() => "?").join(",")})`,
+          ...ids,
+        )) as Dict[];
+        for (const row of clientRows) clientsById.set(String(row.id), mapUser(row));
+      }
+      const countsById = new Map<string, number>();
+      if (include?._count && jobs.length) {
+        const ids = jobs.map((job) => job.id);
+        const countRows = (await qall(
+          `SELECT jobId, COUNT(*) as c FROM Application WHERE jobId IN (${ids.map(() => "?").join(",")}) GROUP BY jobId`,
+          ...ids,
+        )) as Dict[];
+        for (const row of countRows) countsById.set(String(row.jobId), Number(row.c));
+      }
+      return jobs.map((job) => ({
+        ...job,
+        client: include?.client ? clientsById.get(job.clientId) : undefined,
+        _count: include?._count ? { applications: countsById.get(job.id) ?? 0 } : undefined,
+      }));
     },
     async count({ where = {} }: { where?: Dict } = {}) {
       await ensureDemoSeed();

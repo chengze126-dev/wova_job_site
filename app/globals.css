@@ -246,3 +246,17 @@ select {
 .workora-intro-spark {
   animation: workora-spark 2.4s ease-in-out infinite;
 }
+
+body:has([data-auth]) .site-footer {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workora-intro-glow,
+  .workora-intro-shimmer,
+  .workora-intro-ribbon,
+  .workora-intro-spark,
+  .workora-in {
+    animation: none !important;
+  }
+}

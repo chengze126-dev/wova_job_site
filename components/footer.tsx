@@ -1,9 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-const AUTH_PATHS = new Set(["/login", "/signup", "/forgot-password", "/reset-password"]);
 
 const columns = [
   {
@@ -49,11 +44,8 @@ const columns = [
 ];
 
 export function Footer() {
-  const pathname = usePathname();
-  if (AUTH_PATHS.has(pathname)) return null;
-
   return (
-    <footer className="bg-footer text-footer-fg">
+    <footer className="site-footer bg-footer text-footer-fg">
       <div className="mx-auto w-[92%] max-w-[1308px] px-0 pb-10 pt-[48px]">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {columns.map((column) => (

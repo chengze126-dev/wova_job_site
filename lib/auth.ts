@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { prisma, type User } from "./prisma";
@@ -277,7 +278,7 @@ export async function destroySession() {
   await Promise.all(Object.values(AUTH_COOKIES).map((name) => clearCookie(name)));
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+export const getSession = cache(async (): Promise<SessionUser | null> => {
   const token = (await cookies()).get(AUTH_COOKIES.session)?.value;
   if (!token) return null;
   try {
@@ -293,9 +294,9 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});
 
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const session = await getSession();
   if (!session) return null;
   let user = await prisma.user.findUnique({ where: { id: session.id } });
@@ -313,7 +314,7 @@ export async function getCurrentUser() {
     return { ...user, emailVerified: true, emailOtpHash: null, emailOtpExpires: null };
   }
   return user;
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();

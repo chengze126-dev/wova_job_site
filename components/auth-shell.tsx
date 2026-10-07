@@ -33,7 +33,7 @@ export function AuthShell({
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
         />
         <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(0,5,8,0.82)_0%,rgba(0,5,8,0.42)_48%,rgba(0,5,8,0.55)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_20%,rgba(8,184,79,0.22),transparent_42%)]" />

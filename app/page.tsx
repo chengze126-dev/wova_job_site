@@ -1,10 +1,29 @@
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { prisma } from "@/lib/prisma";
 import { JobCard } from "@/components/job-card";
 import { HomeHero } from "@/components/home-hero";
-import { HowItWorks } from "@/components/how-it-works";
 import { HomeMore } from "@/components/home-more";
 import { getSession } from "@/lib/auth";
+
+const HowItWorks = dynamic(
+  () => import("@/components/how-it-works").then((mod) => mod.HowItWorks),
+  { loading: () => <section className="mx-auto h-[380px] w-[92%] max-w-[1308px]" aria-hidden /> },
+);
+
+const homeJobsCache = globalThis as typeof globalThis & {
+  wovaHomeJobs?: { at: number; jobs: Awaited<ReturnType<typeof loadHomepageJobs>> };
+};
+
+async function loadHomepageJobs() {
+  const openJobs = await prisma.job.findMany({
+    where: { status: "OPEN" },
+    include: { client: true },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+  });
+  return pickFeaturedJobs(openJobs, 4);
+}
 
 const referenceBrands = ["Google", "Microsoft", "Amazon", "Stripe", "Notion", "HubSpot"];
 
@@ -26,13 +45,15 @@ function pickFeaturedJobs<T extends { category: string; highBadge: boolean }>(jo
 
 export default async function HomePage() {
   const session = await getSession();
-  const openJobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    include: { client: true, _count: { select: { applications: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 16,
-  });
-  const jobs = pickFeaturedJobs(openJobs, 4);
+  const cached = homeJobsCache.wovaHomeJobs;
+  const jobs =
+    cached && Date.now() - cached.at < 60_000
+      ? cached.jobs
+      : await (async () => {
+          const next = await loadHomepageJobs();
+          homeJobsCache.wovaHomeJobs = { at: Date.now(), jobs: next };
+          return next;
+        })();
 
   return (
     <div className="bg-paper" data-home>

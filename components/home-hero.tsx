@@ -1,20 +1,18 @@
 import Link from "next/link";
-import { preload } from "react-dom";
-import { BriefcaseBusiness, Building2, ShieldCheck, BookOpenText } from "lucide-react";
+import Image from "next/image";
 import type { SessionUser } from "@/lib/auth";
 import { TopNav } from "./header";
 
 const popular = ["Remote", "Software Engineer", "Data Analyst", "Product Manager", "UI/UX Designer"];
 
 const features = [
-  { title: "Thousands of Jobs", body: "Updated daily", Icon: BriefcaseBusiness },
-  { title: "Top Companies", body: "Hiring now", Icon: Building2 },
-  { title: "Trusted Platform", body: "Secure and reliable", Icon: ShieldCheck },
-  { title: "Helpful Resources", body: "Career guidance", Icon: BookOpenText },
+  { title: "Thousands of Jobs", body: "Updated daily", Icon: BriefcaseIcon },
+  { title: "Top Companies", body: "Hiring now", Icon: BuildingIcon },
+  { title: "Trusted Platform", body: "Secure and reliable", Icon: ShieldIcon },
+  { title: "Helpful Resources", body: "Career guidance", Icon: BookIcon },
 ];
 
 export function HomeHero({ user }: { user: SessionUser | null }) {
-  preload("/hero-european-match.png", { as: "image" });
   return (
     <>
       <section className="relative min-h-[448px] overflow-hidden rounded-t-[34px] bg-[#000508] text-white max-md:min-h-0 max-md:rounded-none">
@@ -107,7 +105,7 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
               className="flex min-h-[88px] items-center gap-[15px] py-4 sm:min-h-[100px] sm:px-[31px] sm:py-5 sm:first:pl-0 sm:last:pr-0"
             >
               <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-brand/10 text-[#12b64d]">
-                <Icon size={22} strokeWidth={1.9} />
+                <Icon />
               </span>
               <div>
                 <p className="text-[15px] font-semibold leading-tight text-ink">{title}</p>
@@ -123,12 +121,17 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
 
 function HeroPhoto({ className }: { className: string }) {
   return (
-    <div
-      role="img"
-      aria-label="Professional using a MacBook in a chair"
-      className={`absolute inset-0 bg-cover bg-[position:64%_10%] ${className}`}
-      style={{ backgroundImage: "url('/hero-european-match.png')" }}
-    />
+    <div className={`absolute inset-0 ${className}`}>
+      <Image
+        src="/hero-european-match.png"
+        alt="Professional using a MacBook in a chair"
+        fill
+        priority
+        sizes="(max-width: 1024px) 100vw, 610px"
+        quality={70}
+        className="object-cover object-[64%_10%]"
+      />
+    </div>
   );
 }
 
@@ -168,6 +171,43 @@ function PinIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
       <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z" />
       <circle cx="12" cy="10" r="2.2" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+function BuildingIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16" />
+      <path d="M14 9h5a1 1 0 0 1 1 1v11" />
+      <path d="M8 8h.01M8 12h.01M8 16h.01M12 8h.01M12 12h.01M12 16h.01" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M12 3 5 6v6c0 4.5 2.8 7.4 7 9 4.2-1.6 7-4.5 7-9V6l-7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" />
+      <path d="M6 3v16" />
     </svg>
   );
 }

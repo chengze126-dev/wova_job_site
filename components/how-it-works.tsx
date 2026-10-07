@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { LazyVideo } from "@/components/lazy-video";
 
 type Audience = "hiring" | "talent";
 
@@ -77,10 +78,10 @@ export function HowItWorks() {
                 <Image
                   src={step.src}
                   alt={step.alt}
-                  width={1400}
-                  height={788}
+                  width={800}
+                  height={450}
                   sizes="(max-width: 768px) 92vw, 420px"
-                  quality={90}
+                  quality={70}
                   className={`absolute inset-0 h-full w-full object-cover ${step.position ?? "object-center"}`}
                   style={{ color: "transparent", filter: "blur(0px)" }}
                   suppressHydrationWarning
@@ -120,23 +121,11 @@ function ToggleButton({
 }
 
 function WovaIntro() {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(true);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = true;
-    const play = () => {
-      void video.play().catch(() => undefined);
-    };
-    play();
-    video.addEventListener("canplay", play);
-    return () => video.removeEventListener("canplay", play);
-  }, []);
-
   async function toggle() {
-    const video = videoRef.current;
+    const video = wrapRef.current?.querySelector("video");
     if (!video) return;
     if (video.paused) {
       await video.play();
@@ -148,17 +137,8 @@ function WovaIntro() {
   }
 
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[12px] bg-[#000508]">
-      <video
-        ref={videoRef}
-        className="h-full w-full object-cover"
-        src="/workora-intro.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
+    <div ref={wrapRef} className="relative aspect-video overflow-hidden rounded-[12px] bg-[#000508]">
+      <LazyVideo src="/workora-intro.mp4" label="Wova introduction" className="h-full w-full object-cover" />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,5,8,0.62)_0%,rgba(0,5,8,0.18)_48%,rgba(0,5,8,0.06)_100%)]" />
 
       <div className="absolute inset-y-0 left-0 z-[1] flex w-[48%] flex-col items-center justify-center px-3 text-center">
@@ -184,24 +164,11 @@ function WovaIntro() {
 }
 
 function AutoVideo({ src, label }: { src: string; label: string }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(true);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = true;
-    setPlaying(true);
-    const play = () => {
-      void video.play().catch(() => undefined);
-    };
-    play();
-    video.addEventListener("canplay", play);
-    return () => video.removeEventListener("canplay", play);
-  }, [src]);
-
   async function toggle() {
-    const video = videoRef.current;
+    const video = wrapRef.current?.querySelector("video");
     if (!video) return;
     if (video.paused) {
       await video.play();
@@ -213,17 +180,8 @@ function AutoVideo({ src, label }: { src: string; label: string }) {
   }
 
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[12px] bg-[#0b1220]">
-      <video
-        ref={videoRef}
-        className="h-full w-full object-cover"
-        src={src}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
+    <div ref={wrapRef} className="relative aspect-video overflow-hidden rounded-[12px] bg-[#0b1220]">
+      <LazyVideo src={src} label={label} className="h-full w-full object-cover" />
       <PauseControl playing={playing} onClick={toggle} label={label} />
     </div>
   );

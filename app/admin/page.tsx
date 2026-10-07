@@ -58,7 +58,7 @@ export default async function AdminPage() {
                       {Math.floor((t.introVideoSeconds || 0) / 60)}:{String((t.introVideoSeconds || 0) % 60).padStart(2, "0")}
                     </p>
                   </div>
-                  <video src={t.introVideoUrl || ""} controls preload="metadata" className="mt-3 w-full rounded-xl bg-black" />
+                  <video src={t.introVideoUrl || ""} controls preload="none" className="mt-3 w-full rounded-xl bg-black" />
                 </article>
               ))}
           </div>
@@ -144,7 +144,7 @@ export default async function AdminPage() {
                         <video
                           src={t.introVideoUrl}
                           controls
-                          preload="metadata"
+                          preload="none"
                           className="h-24 w-full rounded-lg bg-black"
                         />
                         <p className="mt-1 text-[11px] text-muted">

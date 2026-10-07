@@ -4,13 +4,17 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  poweredByHeader: false,
+  compress: true,
   outputFileTracingExcludes: {
     "/*": ["./public/uploads/**/*", "./data/**/*", "./.git/**/*"],
   },
   serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client"],
+  optimizePackageImports: ["lucide-react"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
-    qualities: [75, 90],
+    qualities: [70, 75, 90],
+    formats: ["image/avif", "image/webp"],
   },
   experimental: {
     serverActions: {

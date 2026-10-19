@@ -121,7 +121,7 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
 function HeroPhoto() {
   return (
     <img
-      src="/hero-woman.jpg?v=1"
+      src="/hero-woman.jpg?v=2"
       alt="Professional working on a laptop"
       className="absolute inset-0 h-full w-full object-contain object-right-bottom max-lg:object-cover max-lg:object-[72%_20%]"
       decoding="async"

@@ -16,7 +16,7 @@ export type JobCardJob = {
   duration?: string;
   highBadge: boolean;
   connectCost: number;
-  createdAt: Date;
+  createdAt: Date | string;
   status?: string;
   client?: { name: string; companyName: string | null; companyLocation?: string | null } | null;
   _count?: { applications: number };

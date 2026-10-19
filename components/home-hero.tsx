@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { SessionUser } from "@/lib/auth";
 import { TopNav } from "./header";
 
@@ -17,9 +16,9 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
     <>
       <section className="relative min-h-[448px] overflow-hidden rounded-t-[34px] bg-[#000508] text-white max-md:min-h-0 max-md:rounded-none">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 z-10 mx-auto hidden w-[92%] max-w-[1308px] lg:block">
-          <div className="absolute bottom-0 right-0 h-[420px] w-[min(610px,56%)]">
+          <div className="absolute inset-y-0 right-0 w-[min(820px,70%)]">
             <div className="absolute inset-0 overflow-hidden">
-              <HeroPhoto className="origin-top scale-[1.3]" />
+              <HeroPhoto />
             </div>
             <ActiveJobsCard className="absolute left-[-8px] top-[78px] w-[168px]" />
           </div>
@@ -92,7 +91,7 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
         </div>
 
         <div className="relative h-[280px] overflow-hidden lg:hidden">
-          <HeroPhoto className="origin-top scale-[1.28]" />
+          <HeroPhoto />
           <ActiveJobsCard className="absolute left-[4%] top-[28px] w-[148px]" />
         </div>
       </section>
@@ -119,19 +118,15 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
   );
 }
 
-function HeroPhoto({ className }: { className: string }) {
+function HeroPhoto() {
   return (
-    <div className={`absolute inset-0 ${className}`}>
-      <Image
-        src="/hero-european-match.png"
-        alt="Professional using a MacBook in a chair"
-        fill
-        priority
-        sizes="(max-width: 1024px) 100vw, 610px"
-        quality={70}
-        className="object-cover object-[64%_10%]"
-      />
-    </div>
+    <img
+      src="/hero-woman.jpg?v=1"
+      alt="Professional working on a laptop"
+      className="absolute inset-0 h-full w-full object-contain object-right-bottom max-lg:object-cover max-lg:object-[72%_20%]"
+      decoding="async"
+      fetchPriority="high"
+    />
   );
 }
 

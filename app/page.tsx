@@ -1,5 +1,7 @@
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { JobCard } from "@/components/job-card";
 import { HomeHero } from "@/components/home-hero";
@@ -11,19 +13,29 @@ const HowItWorks = dynamic(
   { loading: () => <section className="mx-auto h-[380px] w-[92%] max-w-[1308px]" aria-hidden /> },
 );
 
-const homeJobsCache = globalThis as typeof globalThis & {
-  wovaHomeJobs?: { at: number; jobs: Awaited<ReturnType<typeof loadHomepageJobs>> };
-};
-
-async function loadHomepageJobs() {
-  const openJobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    include: { client: true },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  });
-  return pickFeaturedJobs(openJobs, 4);
-}
+const loadHomepageJobs = unstable_cache(
+  async () => {
+    const openJobs = await prisma.job.findMany({
+      where: { status: "OPEN" },
+      include: { client: true },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    });
+    return pickFeaturedJobs(openJobs, 4).map((job) => ({
+      ...job,
+      createdAt: job.createdAt.toISOString(),
+      client: job.client
+        ? {
+            name: job.client.name,
+            companyName: job.client.companyName,
+            companyLocation: job.client.companyLocation,
+          }
+        : null,
+    }));
+  },
+  ["wova-home-jobs"],
+  { revalidate: 60 },
+);
 
 const referenceBrands = ["Google", "Microsoft", "Amazon", "Stripe", "Notion", "HubSpot"];
 
@@ -43,21 +55,12 @@ function pickFeaturedJobs<T extends { category: string; highBadge: boolean }>(jo
   return unique.sort((a, b) => Number(b.highBadge) - Number(a.highBadge));
 }
 
-export default async function HomePage() {
-  const session = await getSession();
-  const cached = homeJobsCache.wovaHomeJobs;
-  const jobs =
-    cached && Date.now() - cached.at < 60_000
-      ? cached.jobs
-      : await (async () => {
-          const next = await loadHomepageJobs();
-          homeJobsCache.wovaHomeJobs = { at: Date.now(), jobs: next };
-          return next;
-        })();
-
+export default function HomePage() {
   return (
     <div className="bg-paper" data-home>
-      <HomeHero user={session} />
+      <Suspense fallback={<HomeHero user={null} />}>
+        <HomeHeroWithSession />
+      </Suspense>
 
       <section id="companies" className="mx-auto w-[92%] max-w-[1308px] pb-[22px] pt-[24px]">
         <div className="flex items-center justify-between gap-3">
@@ -73,36 +76,72 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto w-[92%] max-w-[1308px] pb-[48px] pt-[1px]">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-[18px] font-bold tracking-[-0.025em] text-ink">Recommended Jobs</h2>
-            <p className="mt-1 text-[13px] text-muted">Fresh briefs from companies hiring on Wova this week.</p>
-          </div>
-          <Link href="/jobs" className="shrink-0 text-[11px] font-semibold text-[#16a34a] hover:underline">
-            View all jobs →
-          </Link>
-        </div>
-
-        <div className="mt-[13px] grid items-stretch gap-[36px] lg:grid-cols-[minmax(0,1fr)_295px]">
-          <div className="overflow-hidden rounded-[11px] border border-line bg-cream shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
-            {jobs.length > 0 ? jobs.map((job) => <JobCard key={job.id} job={job} compact />) : <EmptyJobs />}
-          </div>
-
-          <aside className="flex min-h-[286px] flex-col items-center justify-center rounded-[12px] border border-line bg-cream px-[36px] py-7 text-center shadow-[0_10px_30px_rgba(15,23,42,0.045)]">
-            <div className="flex h-[82px] w-[82px] items-center justify-center rounded-full bg-brand/10 text-[#0fb449]">
-              <BellIcon />
-            </div>
-            <p className="mt-[22px] text-[17px] font-semibold leading-tight text-ink">Get job alerts</p>
-            <p className="mt-[7px] text-[13px] text-muted">delivered to your inbox</p>
-            <Link href="/signup?role=TALENT" className="mt-[31px] block w-full rounded-[7px] bg-[#0db64b] px-4 py-[13px] text-center text-[13px] font-semibold text-white transition hover:bg-[#0aa542]">Create Alert</Link>
-          </aside>
-        </div>
-      </section>
+      <Suspense fallback={<RecommendedJobsFallback />}>
+        <RecommendedJobs />
+      </Suspense>
 
       <HowItWorks />
       <HomeMore />
     </div>
+  );
+}
+
+async function HomeHeroWithSession() {
+  return <HomeHero user={await getSession()} />;
+}
+
+async function RecommendedJobs() {
+  const jobs = await loadHomepageJobs();
+  return <RecommendedJobsLayout jobs={jobs} />;
+}
+
+function RecommendedJobsFallback() {
+  return (
+    <RecommendedJobsLayout>
+      <div className="space-y-4 px-5 py-5">
+        {[0, 1, 2, 3].map((key) => (
+          <div key={key} className="h-[72px] rounded-[10px] bg-paper-2" />
+        ))}
+      </div>
+    </RecommendedJobsLayout>
+  );
+}
+
+function RecommendedJobsLayout({
+  jobs,
+  children,
+}: {
+  jobs?: Awaited<ReturnType<typeof loadHomepageJobs>>;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="mx-auto w-[92%] max-w-[1308px] pb-[48px] pt-[1px]">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[18px] font-bold tracking-[-0.025em] text-ink">Recommended Jobs</h2>
+          <p className="mt-1 text-[13px] text-muted">Fresh briefs from companies hiring on Wova this week.</p>
+        </div>
+        <Link href="/jobs" className="shrink-0 text-[11px] font-semibold text-[#16a34a] hover:underline">
+          View all jobs →
+        </Link>
+      </div>
+
+      <div className="mt-[13px] grid items-stretch gap-[36px] lg:grid-cols-[minmax(0,1fr)_295px]">
+        <div className="overflow-hidden rounded-[11px] border border-line bg-cream shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
+          {children ??
+            (jobs && jobs.length > 0 ? jobs.map((job) => <JobCard key={job.id} job={job} compact />) : <EmptyJobs />)}
+        </div>
+
+        <aside className="flex min-h-[286px] flex-col items-center justify-center rounded-[12px] border border-line bg-cream px-[36px] py-7 text-center shadow-[0_10px_30px_rgba(15,23,42,0.045)]">
+          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-full bg-brand/10 text-[#0fb449]">
+            <BellIcon />
+          </div>
+          <p className="mt-[22px] text-[17px] font-semibold leading-tight text-ink">Get job alerts</p>
+          <p className="mt-[7px] text-[13px] text-muted">delivered to your inbox</p>
+          <Link href="/signup?role=TALENT" className="mt-[31px] block w-full rounded-[7px] bg-[#0db64b] px-4 py-[13px] text-center text-[13px] font-semibold text-white transition hover:bg-[#0aa542]">Create Alert</Link>
+        </aside>
+      </div>
+    </section>
   );
 }
 

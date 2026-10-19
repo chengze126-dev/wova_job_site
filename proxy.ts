@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { SITE_HOST } from "@/lib/site";
 import { isAdminEmail } from "@/lib/admin";
 
 const AUTH_PREFIXES = [
@@ -14,24 +13,7 @@ const AUTH_PREFIXES = [
   "/profile",
 ];
 
-function hostname(req: NextRequest) {
-  return (req.headers.get("host") || req.nextUrl.hostname || "").split(":")[0].toLowerCase();
-}
-
-function canonicalRedirect(req: NextRequest) {
-  const host = hostname(req);
-  if (host !== "wova.cc") return null;
-  const url = req.nextUrl.clone();
-  url.hostname = SITE_HOST;
-  url.port = "";
-  url.protocol = "https:";
-  return NextResponse.redirect(url, 308);
-}
-
 export async function proxy(req: NextRequest) {
-  const redirect = canonicalRedirect(req);
-  if (redirect) return redirect;
-
   const { pathname } = req.nextUrl;
   const needsAuth =
     AUTH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) || pathname === "/jobs/new";
@@ -62,6 +44,14 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|uploads/|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg|mp4)$).*)",
+    "/onboarding/:path*",
+    "/verify-phone/:path*",
+    "/skill-test/:path*",
+    "/messages/:path*",
+    "/connects/:path*",
+    "/billing/:path*",
+    "/admin/:path*",
+    "/profile/:path*",
+    "/jobs/new",
   ],
 };

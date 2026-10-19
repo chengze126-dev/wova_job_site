@@ -3,7 +3,6 @@ import { DEMO_EXTRAS, stringifyExtras } from "./profile-extras";
 import { CODING_QUESTIONS, toCodeQuestionRow } from "./coding-questions";
 import { jobDurationFromTitle, jobTypeFromTitle } from "./constants";
 import { ADMIN_EMAIL, ADMIN_ID, ADMIN_NAME, adminPassword } from "./admin";
-import { hashSync } from "bcryptjs";
 import { isVercelProduction } from "./paths";
 import { marketplaceJobs } from "../prisma/marketplace-data";
 import { getSql, usesRemoteDatabase, type Dict, type SqlDatabase } from "./sql";
@@ -16,11 +15,23 @@ const globalForDb = globalThis as unknown as {
 
 async function db() {
   const instance = await getSql();
-  if (!globalForDb.hirelineMigrated) {
-    await migrate(instance);
+  if (globalForDb.hirelineMigrated) return instance;
+  if (isVercelProduction() && usesRemoteDatabase()) {
     globalForDb.hirelineMigrated = true;
+    return instance;
   }
+  await migrate(instance);
+  globalForDb.hirelineMigrated = true;
   return instance;
+}
+
+async function schemaIsCurrent(instance: SqlDatabase) {
+  try {
+    await instance.prepare("SELECT introVideoUrl FROM User LIMIT 1").get();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function qget(sql: string, ...params: unknown[]) {
@@ -94,6 +105,7 @@ async function ensureCodingQuestions(instance: SqlDatabase) {
 }
 
 async function migrate(instance: SqlDatabase) {
+  if (await schemaIsCurrent(instance)) return;
   await instance.exec(`
     CREATE TABLE IF NOT EXISTS User (
       id TEXT PRIMARY KEY,
@@ -332,27 +344,13 @@ async function ensureSkillAttemptLiveColumns(instance: SqlDatabase) {
 }
 
 async function ensureAdminUser(instance: SqlDatabase) {
-  const createdAt = now();
-  await instance.prepare("DELETE FROM User WHERE role = 'ADMIN' AND lower(email) != ?").run(ADMIN_EMAIL);
-  const password = adminPassword();
   const existing = await instance.prepare("SELECT id FROM User WHERE lower(email) = ?").get(ADMIN_EMAIL);
-  if (!password) {
-    if (existing) {
-      await instance
-        .prepare(`UPDATE User SET role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`)
-        .run(ADMIN_NAME, createdAt, existing.id);
-    }
-    return;
-  }
+  if (existing) return;
+  const password = adminPassword();
+  if (!password) return;
+  const createdAt = now();
+  const { hashSync } = await import("bcryptjs");
   const passwordHash = hashSync(password, 10);
-  if (existing) {
-    await instance
-      .prepare(
-        `UPDATE User SET passwordHash=?, role='ADMIN', name=?, emailVerified=1, onboardingDone=1, phoneVerified=1, updatedAt=? WHERE id=?`,
-      )
-      .run(passwordHash, ADMIN_NAME, createdAt, existing.id);
-    return;
-  }
   await instance
     .prepare(
       `INSERT INTO User (

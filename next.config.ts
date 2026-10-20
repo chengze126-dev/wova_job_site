@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
     "/*": ["./public/uploads/**/*", "./data/**/*", "./.git/**/*"],
   },
   serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client"],
-  optimizePackageImports: ["lucide-react"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
     qualities: [70, 75, 90],

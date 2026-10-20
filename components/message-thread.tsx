@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Forward, Pencil, Trash2 } from "lucide-react";
-import { deleteMessage, editMessage, forwardMessage, sendMessage } from "@/app/actions/messages";
+import { Pencil, Reply, Trash2 } from "lucide-react";
+import { deleteMessage, editMessage, sendMessage } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 import { RefreshOnInterval } from "@/components/refresh-on-interval";
 import { formatTime } from "@/lib/utils";
@@ -13,6 +13,7 @@ type ThreadMessage = {
   content: string;
   createdAt: Date | string;
   editedAt?: Date | string | null;
+  replyToId?: string | null;
 };
 
 export function MessageThread({
@@ -33,10 +34,11 @@ export function MessageThread({
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [forwarding, setForwarding] = useState(false);
+  const [replying, setReplying] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
 
+  const byId = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
   const selected = useMemo(
     () => messages.find((message) => message.id === selectedId) || null,
     [messages, selectedId],
@@ -47,7 +49,7 @@ export function MessageThread({
     if (selectedId && !messages.some((message) => message.id === selectedId)) {
       setSelectedId(null);
       setEditing(false);
-      setForwarding(false);
+      setReplying(false);
     }
   }, [messages, selectedId]);
 
@@ -55,7 +57,7 @@ export function MessageThread({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setEditing(false);
-      setForwarding(false);
+      setReplying(false);
       setSelectedId(null);
       setError("");
     };
@@ -64,13 +66,13 @@ export function MessageThread({
   }, []);
 
   function selectMessage(message: ThreadMessage) {
-    if (selectedId === message.id && !editing && !forwarding) {
+    if (selectedId === message.id && !editing && !replying) {
       setSelectedId(null);
       return;
     }
     setSelectedId(message.id);
     setEditing(false);
-    setForwarding(false);
+    setReplying(false);
     setDraft(message.content);
     setError("");
   }
@@ -79,19 +81,33 @@ export function MessageThread({
     if (!selected || !mineSelected) return;
     setDraft(selected.content);
     setEditing(true);
-    setForwarding(false);
+    setReplying(false);
+    setError("");
+  }
+
+  function startReply() {
+    if (!selected) return;
+    setReplying(true);
+    setEditing(false);
+    setDraft("");
     setError("");
   }
 
   return (
     <>
-      {!editing ? <RefreshOnInterval seconds={4} /> : null}
+      {!editing && !replying ? <RefreshOnInterval seconds={4} /> : null}
       <div className="mt-6 flex max-h-[55vh] flex-col gap-2 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
         {messages.map((message) => {
           const mine = message.senderId === currentUserId;
           const active = selectedId === message.id;
+          const quoted = message.replyToId ? byId.get(message.replyToId) : null;
           return (
             <div key={message.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+              {quoted ? (
+                <p className="mb-1 max-w-[80%] truncate rounded-lg border-l-2 border-[#14a800] bg-paper px-2 py-1 text-[11px] text-muted">
+                  {quoted.content}
+                </p>
+              ) : null}
               <button
                 type="button"
                 onClick={() => selectMessage(message)}
@@ -108,6 +124,16 @@ export function MessageThread({
               </p>
               {active ? (
                 <div className="mt-1 flex items-center gap-1 rounded-full border border-line bg-paper px-1 py-0.5">
+                  {canSend ? (
+                    <button
+                      type="button"
+                      onClick={startReply}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium hover:bg-cream"
+                    >
+                      <Reply size={12} />
+                      Reply
+                    </button>
+                  ) : null}
                   {mineSelected ? (
                     <button
                       type="button"
@@ -139,18 +165,6 @@ export function MessageThread({
                       </button>
                     </form>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForwarding(true);
-                      setEditing(false);
-                      setError("");
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium hover:bg-cream"
-                  >
-                    <Forward size={12} />
-                    Forward
-                  </button>
                 </div>
               ) : null}
             </div>
@@ -200,28 +214,40 @@ export function MessageThread({
             <SubmitButton className="!rounded-full !bg-[#14a800] !px-4 !py-2">Save edit</SubmitButton>
           </div>
         </form>
-      ) : forwarding && selected ? (
+      ) : replying && selected && canSend ? (
         <form
-          action={async () => {
-            const result = await forwardMessage(selected.id);
+          ref={formRef}
+          action={async (formData) => {
+            formData.set("replyToId", selected.id);
+            const result = await sendMessage(conversationId, formData);
             if (result && "error" in result) {
               setError(result.error);
               return;
             }
-            setForwarding(false);
+            formRef.current?.reset();
+            setReplying(false);
             setSelectedId(null);
           }}
           className="mt-4 space-y-3 rounded-2xl border border-line bg-paper p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Forward to {otherName}</p>
-          <div className="rounded-[18px] bg-[#dce8e3] px-4 py-2 text-sm leading-6 whitespace-pre-wrap break-words text-[#0b1f17]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+            Reply {selected.senderId === currentUserId ? "" : `to ${otherName}`}
+          </p>
+          <div className="rounded-[18px] border-l-4 border-[#14a800] bg-[#dce8e3] px-4 py-2 text-sm leading-6 whitespace-pre-wrap break-words text-[#0b1f17]">
             {selected.content}
           </div>
+          <textarea
+            name="content"
+            required
+            placeholder="Write a reply"
+            rows={3}
+            className="w-full rounded-2xl border border-line bg-cream px-4 py-2.5 text-sm leading-6"
+          />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setForwarding(false)} className="rounded-full px-4 py-2 text-sm text-muted">
+            <button type="button" onClick={() => setReplying(false)} className="rounded-full px-4 py-2 text-sm text-muted">
               Cancel
             </button>
-            <SubmitButton className="!rounded-full !bg-[#14a800] !px-4 !py-2">Forward</SubmitButton>
+            <SubmitButton className="!rounded-full !bg-[#14a800] !px-4 !py-2">Reply</SubmitButton>
           </div>
         </form>
       ) : canSend ? (

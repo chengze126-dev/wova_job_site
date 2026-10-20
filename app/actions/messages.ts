@@ -76,8 +76,16 @@ export async function sendMessage(conversationId: string, formData: FormData) {
   const allowed = await canSendDirectMessage(user, other, conversationId);
   if (!allowed.ok) return { error: allowed.error };
 
+  const replyToId = String(formData.get("replyToId") || "").trim() || null;
+  if (replyToId) {
+    const quoted = await prisma.message.findUnique({ where: { id: replyToId } });
+    if (!quoted || quoted.conversationId !== conversationId) {
+      return { error: "That message is not in this conversation." };
+    }
+  }
+
   await prisma.message.create({
-    data: { conversationId, senderId: user.id, content },
+    data: { conversationId, senderId: user.id, content, ...(replyToId ? { replyToId } : {}) },
   });
   await prisma.conversation.update({
     where: { id: conversationId },
@@ -124,42 +132,6 @@ export async function deleteMessage(messageId: string) {
   if ("error" in loaded) return loaded;
   await prisma.message.delete({ where: { id: messageId } });
   revalidatePath(`/messages/${loaded.message.conversationId}`);
-  revalidatePath("/messages");
-  revalidatePath("/", "layout");
-  return { ok: true as const };
-}
-
-export async function forwardMessage(messageId: string) {
-  const user = await getCurrentUser();
-  if (!user) return { error: "Sign in first." };
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) return { error: "Message not found." };
-
-  const conversation = await prisma.conversation.findUnique({ where: { id: message.conversationId } });
-  if (!conversation) return { error: "Conversation not found." };
-  if (conversation.userAId !== user.id && conversation.userBId !== user.id && user.role !== "ADMIN") {
-    return { error: "You are not in this conversation." };
-  }
-
-  const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
-  const other = await prisma.user.findUnique({ where: { id: otherUserId } });
-  if (!other) return { error: "User not found." };
-  const allowed = await canSendDirectMessage(user, other, conversation.id);
-  if (!allowed.ok) return { error: allowed.error };
-
-  await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      senderId: user.id,
-      content: `Forwarded:\n${message.content}`,
-    },
-  });
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: { updatedAt: new Date() },
-  });
-  await markConversationRead(conversation.id);
-  revalidatePath(`/messages/${conversation.id}`);
   revalidatePath("/messages");
   revalidatePath("/", "layout");
   return { ok: true as const };

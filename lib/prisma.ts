@@ -203,6 +203,7 @@ async function migrate(instance: SqlDatabase) {
       content TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       editedAt TEXT,
+      replyToId TEXT,
       FOREIGN KEY (conversationId) REFERENCES Conversation(id) ON DELETE CASCADE,
       FOREIGN KEY (senderId) REFERENCES User(id) ON DELETE CASCADE
     );
@@ -342,6 +343,7 @@ async function ensureLiveColumns(instance: SqlDatabase) {
     "ALTER TABLE Conversation ADD COLUMN lastReadA TEXT",
     "ALTER TABLE Conversation ADD COLUMN lastReadB TEXT",
     "ALTER TABLE Message ADD COLUMN editedAt TEXT",
+    "ALTER TABLE Message ADD COLUMN replyToId TEXT",
   ]) {
     try {
       await instance.exec(sql);
@@ -550,6 +552,7 @@ function mapMessage(row: Dict) {
     content: String(row.content),
     createdAt: new Date(String(row.createdAt)),
     editedAt: toDate(row.editedAt),
+    replyToId: row.replyToId ? String(row.replyToId) : null,
   };
 }
 
@@ -1066,8 +1069,28 @@ export const prisma = {
     },
     async create({ data }: { data: Dict }) {
       const messageId = id();
-      await qrun("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)", messageId, data.conversationId, data.senderId, data.content, now());
-      return { id: messageId, ...data, createdAt: new Date(), editedAt: null };
+      const replyToId = data.replyToId ? String(data.replyToId) : null;
+      try {
+        await qrun(
+          "INSERT INTO Message (id, conversationId, senderId, content, createdAt, replyToId) VALUES (?,?,?,?,?,?)",
+          messageId,
+          data.conversationId,
+          data.senderId,
+          data.content,
+          now(),
+          replyToId,
+        );
+      } catch {
+        await qrun(
+          "INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)",
+          messageId,
+          data.conversationId,
+          data.senderId,
+          data.content,
+          now(),
+        );
+      }
+      return { id: messageId, ...data, createdAt: new Date(), editedAt: null, replyToId };
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
       const current = await this.findUnique({ where });

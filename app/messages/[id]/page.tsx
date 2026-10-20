@@ -60,6 +60,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           content: message.content,
           createdAt: message.createdAt,
           editedAt: message.editedAt,
+          replyToId: message.replyToId,
         }))}
       />
     </div>

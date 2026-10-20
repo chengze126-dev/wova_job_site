@@ -45,7 +45,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-muted">Direct message</p>
           <h1 className="font-display text-3xl">{other.name}</h1>
-          <p className="text-sm text-muted">{other.companyName || other.email}</p>
+          {other.companyName ? <p className="text-sm text-muted">{other.companyName}</p> : null}
         </div>
       </div>
       <MessageThread

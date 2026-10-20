@@ -55,8 +55,12 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         {conversation.messages?.map((message) => {
           const mine = message.senderId === user.id;
           return (
-            <div key={message.id} className={`max-w-[80%] ${mine ? "ml-auto" : ""}`}>
-              <div className={`rounded-2xl px-4 py-2 text-sm leading-6 ${mine ? "bg-pine text-cream" : "bg-paper"}`}>
+            <div key={message.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+              <div
+                className={`w-fit max-w-[80%] rounded-[22px] px-4 py-2 text-sm leading-6 whitespace-pre-wrap break-words ${
+                  mine ? "bg-[#7ee2c4] text-[#0b1f17]" : "bg-[#dce8e3] text-[#0b1f17] dark:bg-[#3d5248] dark:text-[#f3f6f4]"
+                }`}
+              >
                 {message.content}
               </div>
               <p className="mt-1 text-[11px] text-muted">{formatDate(message.createdAt)}</p>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { conversationPair } from "@/lib/utils";
+import { isTyping } from "@/lib/presence";
 
 export async function hasReceivedFrom(senderId: string, recipientId: string) {
   const pair = conversationPair(senderId, recipientId);
@@ -87,6 +88,7 @@ export async function sendMessage(conversationId: string, formData: FormData) {
   await prisma.message.create({
     data: { conversationId, senderId: user.id, content, ...(replyToId ? { replyToId } : {}) },
   });
+  await prisma.conversation.clearTyping(conversationId, user.id);
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { updatedAt: new Date() },
@@ -167,4 +169,26 @@ export async function pingPresence() {
   await prisma.user.touchLastSeen(user.id);
   const unread = await prisma.message.unreadCount(user.id);
   return { unread };
+}
+
+export async function pingTyping(conversationId: string) {
+  const user = await getCurrentUser();
+  if (!user || !conversationId) return { ok: false };
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) return { ok: false };
+  if (conversation.userAId !== user.id && conversation.userBId !== user.id) return { ok: false };
+  await prisma.conversation.touchTyping(conversationId, user.id);
+  return { ok: true };
+}
+
+export async function typingStatus(conversationId: string) {
+  const user = await getCurrentUser();
+  if (!user || !conversationId) return { typing: false };
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) return { typing: false };
+  if (conversation.userAId !== user.id && conversation.userBId !== user.id && user.role !== "ADMIN") {
+    return { typing: false };
+  }
+  const otherAt = conversation.userAId === user.id ? conversation.typingAtB : conversation.typingAtA;
+  return { typing: isTyping(otherAt) };
 }

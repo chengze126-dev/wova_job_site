@@ -192,6 +192,8 @@ async function migrate(instance: SqlDatabase) {
       updatedAt TEXT NOT NULL,
       lastReadA TEXT,
       lastReadB TEXT,
+      typingAtA TEXT,
+      typingAtB TEXT,
       UNIQUE(userAId, userBId),
       FOREIGN KEY (userAId) REFERENCES User(id) ON DELETE CASCADE,
       FOREIGN KEY (userBId) REFERENCES User(id) ON DELETE CASCADE
@@ -344,6 +346,8 @@ async function ensureLiveColumns(instance: SqlDatabase) {
     "ALTER TABLE Conversation ADD COLUMN lastReadB TEXT",
     "ALTER TABLE Message ADD COLUMN editedAt TEXT",
     "ALTER TABLE Message ADD COLUMN replyToId TEXT",
+    "ALTER TABLE Conversation ADD COLUMN typingAtA TEXT",
+    "ALTER TABLE Conversation ADD COLUMN typingAtB TEXT",
   ]) {
     try {
       await instance.exec(sql);
@@ -995,6 +999,8 @@ export const prisma = {
         updatedAt: new Date(String(row.updatedAt)),
         lastReadA: toDate(row.lastReadA),
         lastReadB: toDate(row.lastReadB),
+        typingAtA: toDate(row.typingAtA),
+        typingAtB: toDate(row.typingAtB),
       };
       const userA = include?.userA ? await getUserById(convo.userAId) : undefined;
       const userB = include?.userB ? await getUserById(convo.userBId) : undefined;
@@ -1057,6 +1063,33 @@ export const prisma = {
         where.id,
       );
       return this.findUnique({ where });
+    },
+    async touchTyping(conversationId: string, userId: string) {
+      const current = await this.findUnique({ where: { id: conversationId } });
+      if (!current) return;
+      const stamp = now();
+      try {
+        if (current.userAId === userId) {
+          await qrun("UPDATE Conversation SET typingAtA = ? WHERE id = ?", stamp, conversationId);
+        } else if (current.userBId === userId) {
+          await qrun("UPDATE Conversation SET typingAtB = ? WHERE id = ?", stamp, conversationId);
+        }
+      } catch {
+        // column may not exist yet
+      }
+    },
+    async clearTyping(conversationId: string, userId: string) {
+      const current = await this.findUnique({ where: { id: conversationId } });
+      if (!current) return;
+      try {
+        if (current.userAId === userId) {
+          await qrun("UPDATE Conversation SET typingAtA = NULL WHERE id = ?", conversationId);
+        } else if (current.userBId === userId) {
+          await qrun("UPDATE Conversation SET typingAtB = NULL WHERE id = ?", conversationId);
+        }
+      } catch {
+        // column may not exist yet
+      }
     },
     async deleteMany() {
       await qexec("DELETE FROM Conversation");

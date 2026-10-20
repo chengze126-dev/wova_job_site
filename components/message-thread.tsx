@@ -32,11 +32,47 @@ export function MessageThread({
   messages: ThreadMessage[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const lastTypingPing = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  const [otherTyping, setOtherTyping] = useState(false);
+
+  function notifyTyping() {
+    const now = Date.now();
+    if (now - lastTypingPing.current < 1200) return;
+    lastTypingPing.current = now;
+    void fetch("/api/typing", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId }),
+    });
+  }
+
+  useEffect(() => {
+    let stop = false;
+    async function tick() {
+      try {
+        const res = await fetch(`/api/typing?conversationId=${encodeURIComponent(conversationId)}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { typing?: boolean };
+        if (!stop) setOtherTyping(Boolean(data.typing));
+      } catch {
+        // ignore network errors
+      }
+    }
+    void tick();
+    const id = setInterval(() => void tick(), 2000);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [conversationId]);
 
   const byId = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
   const selected = useMemo(
@@ -170,6 +206,16 @@ export function MessageThread({
             </div>
           );
         })}
+        {otherTyping ? (
+          <p className="mt-1 text-sm text-muted">
+            <span className="font-medium text-ink">{otherName}</span> is typing
+            <span className="inline-flex w-6 justify-between pl-1">
+              <span className="animate-pulse">.</span>
+              <span className="animate-pulse [animation-delay:150ms]">.</span>
+              <span className="animate-pulse [animation-delay:300ms]">.</span>
+            </span>
+          </p>
+        ) : null}
       </div>
 
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
@@ -196,7 +242,10 @@ export function MessageThread({
             name="content"
             required
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              notifyTyping();
+            }}
             rows={3}
             className="w-full rounded-2xl border border-line bg-cream px-4 py-2.5 text-sm leading-6"
           />
@@ -241,6 +290,7 @@ export function MessageThread({
             required
             placeholder="Write a reply"
             rows={3}
+            onChange={() => notifyTyping()}
             className="w-full rounded-2xl border border-line bg-cream px-4 py-2.5 text-sm leading-6"
           />
           <div className="flex justify-end gap-2">
@@ -263,6 +313,7 @@ export function MessageThread({
             name="content"
             required
             placeholder="Write a message"
+            onChange={() => notifyTyping()}
             className="flex-1 rounded-full border border-line bg-cream px-4 py-2.5 text-sm"
           />
           <SubmitButton>Send</SubmitButton>

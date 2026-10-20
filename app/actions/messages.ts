@@ -129,6 +129,48 @@ export async function deleteMessage(messageId: string) {
   return { ok: true as const };
 }
 
+export async function forwardMessage(messageId: string, toConversationId: string) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." };
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) return { error: "Message not found." };
+
+  const source = await prisma.conversation.findUnique({ where: { id: message.conversationId } });
+  if (!source) return { error: "Conversation not found." };
+  if (source.userAId !== user.id && source.userBId !== user.id && user.role !== "ADMIN") {
+    return { error: "You are not in this conversation." };
+  }
+
+  const target = await prisma.conversation.findUnique({ where: { id: toConversationId } });
+  if (!target) return { error: "Conversation not found." };
+  if (target.userAId !== user.id && target.userBId !== user.id && user.role !== "ADMIN") {
+    return { error: "You are not in that conversation." };
+  }
+
+  const otherUserId = target.userAId === user.id ? target.userBId : target.userAId;
+  const other = await prisma.user.findUnique({ where: { id: otherUserId } });
+  if (!other) return { error: "User not found." };
+  const allowed = await canSendDirectMessage(user, other, toConversationId);
+  if (!allowed.ok) return { error: allowed.error };
+
+  await prisma.message.create({
+    data: {
+      conversationId: toConversationId,
+      senderId: user.id,
+      content: `Forwarded:\n${message.content}`,
+    },
+  });
+  await prisma.conversation.update({
+    where: { id: toConversationId },
+    data: { updatedAt: new Date() },
+  });
+  await markConversationRead(toConversationId);
+  revalidatePath(`/messages/${toConversationId}`);
+  revalidatePath("/messages");
+  revalidatePath("/", "layout");
+  return { ok: true as const, conversationId: toConversationId };
+}
+
 export async function markConversationRead(conversationId: string) {
   const user = await getCurrentUser();
   if (!user) return;

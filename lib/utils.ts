@@ -34,6 +34,15 @@ export function formatDate(value: Date | string) {
   }).format(date);
 }
 
+export function formatTime(value: Date | string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function initials(name: string) {
   return name
     .split(" ")

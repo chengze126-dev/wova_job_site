@@ -1,9 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { MessageComposer } from "@/components/message-composer";
-import { MessageItem } from "@/components/message-item";
-import { RefreshOnInterval } from "@/components/refresh-on-interval";
+import { MessageThread } from "@/components/message-thread";
 import { canSendDirectMessage, markConversationRead } from "@/app/actions/messages";
 import { isOnline } from "@/lib/presence";
 import { ProfileAvatar } from "@/components/profile-avatar";
@@ -34,9 +32,23 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const canSend = receivedFirst || (await canSendDirectMessage(user, other, id)).ok;
   await markConversationRead(id);
 
+  const threads = await prisma.conversation.findMany({
+    where: { OR: [{ userAId: user.id }, { userBId: user.id }] },
+    include: { userA: true, userB: true },
+  });
+  const forwardTargets = threads
+    .filter((thread) => thread && thread.id !== id)
+    .map((thread) => {
+      const person = thread.userAId === user.id ? thread.userB : thread.userA;
+      return {
+        id: thread.id,
+        name: person?.name || "User",
+        avatarUrl: person?.avatarUrl || null,
+      };
+    });
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col px-5 py-10">
-      <RefreshOnInterval seconds={4} />
       <div className="flex items-center gap-3">
         <ProfileAvatar
           name={other.name}
@@ -51,25 +63,20 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           <p className="text-sm text-muted">{other.companyName || other.email}</p>
         </div>
       </div>
-      <div className="mt-6 flex max-h-[55vh] flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
-        {conversation.messages?.map((message) => (
-          <MessageItem
-            key={message.id}
-            id={message.id}
-            content={message.content}
-            createdAt={message.createdAt}
-            editedAt={message.editedAt}
-            mine={message.senderId === user.id}
-          />
-        ))}
-      </div>
-      {canSend ? (
-        <MessageComposer conversationId={id} />
-      ) : (
-        <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          You can reply after this {other.role === "ADMIN" ? "admin" : "client"} messages you first.
-        </p>
-      )}
+      <MessageThread
+        conversationId={id}
+        currentUserId={user.id}
+        canSend={canSend}
+        waitCopy={`You can reply after this ${other.role === "ADMIN" ? "admin" : "client"} messages you first.`}
+        messages={(conversation.messages || []).map((message) => ({
+          id: message.id,
+          senderId: message.senderId,
+          content: message.content,
+          createdAt: message.createdAt,
+          editedAt: message.editedAt,
+        }))}
+        forwardTargets={forwardTargets}
+      />
     </div>
   );
 }

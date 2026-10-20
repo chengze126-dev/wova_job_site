@@ -92,7 +92,7 @@ export async function updateProfileBasics(_prev: { error?: string } | null, form
   if (!Number.isFinite(hourlyRate) || hourlyRate < 5 || hourlyRate > 500) {
     return { error: "Enter an hourly rate between $5 and $500." };
   }
-  if (skills.length < 2) return { error: "Add at least two skills." };
+  if (skills.length < 1) return { error: "Add at least one skill." };
   if (phone && phone.replace(/\D/g, "").length < 8) {
     return { error: "Enter a valid phone number with country code." };
   }

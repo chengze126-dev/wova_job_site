@@ -11,19 +11,59 @@ const IMAGE_MIME: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "application/pdf": ".pdf",
+  "application/msword": ".doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "text/plain": ".txt",
+};
+
+function fileExt(file: File) {
+  const named = path.extname(file.name).toLowerCase();
+  if (named) return named;
+  return MIME_EXT[(file.type || "").toLowerCase()] || "";
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function isUploadFolder(folder: string): folder is UploadFolder {
   return (UPLOAD_FOLDERS as readonly string[]).includes(folder);
 }
 
 async function toOptimizedImageDataUrl(buffer: Buffer, mimeHint: string) {
+  const jpegAlready = buffer.length <= 280_000 && /jpe?g/i.test(mimeHint);
+  if (jpegAlready) {
+    return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+  }
   try {
     const sharp = (await import("sharp")).default;
-    const out = await sharp(buffer)
-      .rotate()
-      .resize(720, 720, { fit: "inside", withoutEnlargement: true })
-      .flatten({ background: "#ffffff" })
-      .jpeg({ quality: 80, mozjpeg: true })
-      .toBuffer();
+    const out = await withTimeout(
+      sharp(buffer)
+        .rotate()
+        .resize(720, 720, { fit: "inside", withoutEnlargement: true })
+        .flatten({ background: "#ffffff" })
+        .jpeg({ quality: 80, mozjpeg: true })
+        .toBuffer(),
+      4000,
+    );
     return `data:image/jpeg;base64,${out.toString("base64")}`;
   } catch {
     if (buffer.length > 350_000) {
@@ -109,7 +149,7 @@ export async function savePublicUpload({
   if (file.size > maxBytes) {
     return { error: `File must be under ${Math.round(maxBytes / (1024 * 1024))}MB.` };
   }
-  const ext = path.extname(file.name).toLowerCase() || "";
+  const ext = fileExt(file);
   if (!allowed.includes(ext)) {
     return { error: `Upload a ${allowed.map((item) => item.replace(".", "").toUpperCase()).join(", ")} file.` };
   }
@@ -127,6 +167,10 @@ export async function savePublicUpload({
   }
 
   const filename = `${userId}-${Date.now()}${ext}`;
-  await writeDiskUpload(folder, filename, buffer);
+  try {
+    await writeDiskUpload(folder, filename, buffer);
+  } catch {
+    return { error: "Could not save that file. Try a smaller resume and save again." };
+  }
   return { url: publicUploadUrl(folder, filename) };
 }

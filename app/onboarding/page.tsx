@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { COMPANY_SIZES, INDUSTRIES } from "@/lib/constants";
-import { completeClientOnboarding, completeTalentOnboarding } from "@/app/actions/auth";
+import { completeClientOnboarding } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/submit-button";
-import { AvatarInput } from "@/components/avatar-input";
 import { PhoneInput } from "@/components/phone-input";
 import { LocationInput } from "@/components/location-input";
+import { TalentOnboardingForm } from "@/components/talent-onboarding-form";
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
@@ -25,70 +25,13 @@ export default async function OnboardingPage() {
           Add a photo, title, rate, and skills so clients can find you. The skill test is optional after
           your profile is live.
         </p>
-        <form action={completeTalentOnboarding} className="mt-8 space-y-4 rounded-2xl border border-line bg-cream p-6">
-          <AvatarInput personName={user.name} currentSrc={user.avatarUrl} required={!user.avatarUrl} />
-          <LocationInput defaultCity="" defaultCountry={user.country} required />
-          <label className="block text-sm">
-            Professional title
-            <input
-              name="title"
-              required
-              minLength={4}
-              placeholder="Full-Stack Developer"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Hourly rate (USD)
-            <input
-              name="hourlyRate"
-              type="number"
-              required
-              min={5}
-              max={500}
-              placeholder="45"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Skills (comma-separated)
-            <input
-              name="skills"
-              required
-              placeholder="React, TypeScript, Node.js"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            LinkedIn profile URL
-            <input
-              name="linkedinUrl"
-              required={!user.linkedinUrl}
-              defaultValue={user.linkedinUrl || ""}
-              placeholder="https://www.linkedin.com/in/you"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            GitHub profile URL
-            <input
-              name="githubUrl"
-              defaultValue=""
-              placeholder="https://github.com/you"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2"
-            />
-          </label>
-          <PhoneInput defaultCountry={user.country} defaultPhone={user.phone} required />
-          <label className="block text-sm">
-            Resume (PDF, DOC, DOCX, or TXT)
-            <input name="resume" type="file" accept=".pdf,.doc,.docx,.txt" required className="mt-1 w-full text-sm" />
-          </label>
-          <label className="block text-sm">
-            Overview
-            <textarea name="bio" rows={5} placeholder="Tell clients what you do and the work you want." className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2" />
-          </label>
-          <SubmitButton>Save profile</SubmitButton>
-        </form>
+        <TalentOnboardingForm
+          name={user.name}
+          avatarUrl={user.avatarUrl}
+          linkedinUrl={user.linkedinUrl}
+          country={user.country}
+          phone={user.phone}
+        />
       </div>
     );
   }

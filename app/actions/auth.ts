@@ -273,7 +273,7 @@ export async function logoutUser() {
   redirect("/");
 }
 
-export async function completeTalentOnboarding(formData: FormData) {
+export async function completeTalentOnboarding(_prev: { error?: string } | null, formData: FormData) {
   const user = await getCurrentUser();
   if (!user || user.role !== "TALENT") return { error: "Only talent accounts can complete this step." };
 
@@ -299,31 +299,38 @@ export async function completeTalentOnboarding(formData: FormData) {
   if (!Number.isFinite(hourlyRate) || hourlyRate < 5 || hourlyRate > 500) {
     return { error: "Enter an hourly rate between $5 and $500." };
   }
-  if (skills.length < 2) return { error: "Add at least two skills." };
+  if (skills.length < 1) return { error: "Add at least one skill." };
 
   if (!(avatar instanceof File) || avatar.size === 0) {
     if (!user.avatarUrl) return { error: "Upload a profile photo to continue." };
   }
-  const [avatarSaved, resumeSaved] = await Promise.all([
-    avatar instanceof File && avatar.size > 0
-      ? savePublicUpload({
-          file: avatar,
-          folder: "avatars",
-          userId: user.id,
-          allowed: [".jpg", ".jpeg", ".png", ".webp"],
-          maxBytes: 5 * 1024 * 1024,
-        })
-      : Promise.resolve(null),
-    resume instanceof File && resume.size > 0
-      ? savePublicUpload({
-          file: resume,
-          folder: "resumes",
-          userId: user.id,
-          allowed: [".pdf", ".doc", ".docx", ".txt"],
-          maxBytes: 8 * 1024 * 1024,
-        })
-      : Promise.resolve(null),
-  ]);
+
+  let avatarSaved: { url: string } | { error: string } | null = null;
+  let resumeSaved: { url: string } | { error: string } | null = null;
+  try {
+    [avatarSaved, resumeSaved] = await Promise.all([
+      avatar instanceof File && avatar.size > 0
+        ? savePublicUpload({
+            file: avatar,
+            folder: "avatars",
+            userId: user.id,
+            allowed: [".jpg", ".jpeg", ".png", ".webp"],
+            maxBytes: 5 * 1024 * 1024,
+          })
+        : Promise.resolve(null),
+      resume instanceof File && resume.size > 0
+        ? savePublicUpload({
+            file: resume,
+            folder: "resumes",
+            userId: user.id,
+            allowed: [".pdf", ".doc", ".docx", ".txt"],
+            maxBytes: 8 * 1024 * 1024,
+          })
+        : Promise.resolve(null),
+    ]);
+  } catch {
+    return { error: "Could not upload that photo or resume. Try a smaller file and save again." };
+  }
   if (avatarSaved && "error" in avatarSaved) return { error: avatarSaved.error };
   if (resumeSaved && "error" in resumeSaved) return { error: resumeSaved.error };
 
@@ -336,23 +343,34 @@ export async function completeTalentOnboarding(formData: FormData) {
   extras.city = city || extras.city;
   if (githubUrl) extras.githubUrl = githubUrl;
 
-  const saved = await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      linkedinUrl,
-      phone,
-      bio,
-      resumeUrl,
-      avatarUrl,
-      title,
-      hourlyRate,
-      skills: JSON.stringify(skills),
-      extras: stringifyExtras(extras),
-      onboardingDone: true,
-      ...(country ? { country } : {}),
-    },
-  });
-  if (saved) await rememberSignup(snapshotFromUser(saved));
+  let saved;
+  try {
+    saved = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        linkedinUrl,
+        phone,
+        bio,
+        resumeUrl,
+        avatarUrl,
+        title,
+        hourlyRate,
+        skills: JSON.stringify(skills),
+        extras: stringifyExtras(extras),
+        onboardingDone: true,
+        ...(country ? { country } : {}),
+      },
+    });
+  } catch {
+    return { error: "Could not save your profile. Try a smaller photo and save again." };
+  }
+  if (saved) {
+    try {
+      await rememberSignup(snapshotFromUser(saved));
+    } catch {
+      /* snapshot cookie is best-effort */
+    }
+  }
 
   redirect(`/profile/${user.id}`);
 }
@@ -425,7 +443,7 @@ export async function updateProfile(formData: FormData) {
     if (!Number.isFinite(hourlyRate) || hourlyRate < 5 || hourlyRate > 500) {
       return { error: "Enter an hourly rate between $5 and $500." };
     }
-    if (skills.length < 2) return { error: "Add at least two skills." };
+    if (skills.length < 1) return { error: "Add at least one skill." };
     data.title = title;
     data.hourlyRate = hourlyRate;
     data.skills = JSON.stringify(skills);

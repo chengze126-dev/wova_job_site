@@ -38,7 +38,8 @@ export function AvatarInput({
       if (!job) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      void job.finally(() => {
+      const giveUp = new Promise<void>((resolve) => setTimeout(resolve, 4000));
+      void Promise.race([job, giveUp]).finally(() => {
         pending.current = null;
         form.requestSubmit();
       });

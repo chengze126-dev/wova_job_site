@@ -1058,13 +1058,13 @@ export const prisma = {
       await qrun("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)", messageId, data.conversationId, data.senderId, data.content, now());
       return { id: messageId, ...data, createdAt: new Date() };
     },
-    async countFrom({ conversationId, senderId }: { conversationId: string; senderId: string }) {
+    async existsFrom({ conversationId, senderId }: { conversationId: string; senderId: string }) {
       const row = (await qget(
-        "SELECT COUNT(*) as c FROM Message WHERE conversationId = ? AND senderId = ?",
+        "SELECT id FROM Message WHERE conversationId = ? AND senderId = ? LIMIT 1",
         conversationId,
         senderId,
-      )) as Dict;
-      return Number(row?.c ?? 0);
+      )) as Dict | undefined;
+      return Boolean(row?.id);
     },
     async unreadCount(userId: string) {
       try {

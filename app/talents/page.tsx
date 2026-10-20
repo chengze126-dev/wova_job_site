@@ -10,7 +10,6 @@ import { formatHourly } from "@/lib/utils";
 import { formatLocation, skillOverlap, textMatchesQuery } from "@/lib/geo";
 import { parseExtras } from "@/lib/profile-extras";
 import { isOnline } from "@/lib/presence";
-import { OnlineBadge } from "@/components/online-badge";
 
 export default async function TalentsPage({
   searchParams,
@@ -129,7 +128,7 @@ export default async function TalentsPage({
                   src={talent.avatarUrl}
                   size={72}
                   badge={talent.talentBadge}
-                  online={isOnline(talent.lastSeenAt)}
+                  presence={isOnline(talent.lastSeenAt)}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -137,7 +136,6 @@ export default async function TalentsPage({
                       <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-ink">
                         {talent.name}
                         {talent.talentBadge ? <TalentBadge compact /> : null}
-                        <OnlineBadge lastSeenAt={talent.lastSeenAt} compact />
                       </h2>
                       <p className="mt-0.5 flex items-center gap-1 text-sm text-muted">
                         <MapPin size={13} />

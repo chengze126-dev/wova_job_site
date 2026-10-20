@@ -7,7 +7,6 @@ import { SubmitButton } from "@/components/submit-button";
 import { TalentProfile } from "@/components/talent-profile";
 import { isOnline } from "@/lib/presence";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { OnlineBadge } from "@/components/online-badge";
 
 export default async function PublicProfilePage({
   params,
@@ -53,12 +52,9 @@ export default async function PublicProfilePage({
     <div className="mx-auto max-w-3xl px-5 py-12">
       <p className="text-xs uppercase tracking-[0.24em] text-muted">Client</p>
       <div className="mt-2 flex items-center gap-3">
-        <ProfileAvatar name={profile.name} src={profile.avatarUrl} size={56} online={isOnline(profile.lastSeenAt)} />
+        <ProfileAvatar name={profile.name} src={profile.avatarUrl} size={56} presence={isOnline(profile.lastSeenAt)} />
         <div>
-          <h1 className="font-display flex flex-wrap items-center gap-2 text-4xl">
-            {profile.name}
-            <OnlineBadge lastSeenAt={profile.lastSeenAt} />
-          </h1>
+          <h1 className="font-display text-4xl">{profile.name}</h1>
         </div>
       </div>
       {profile.companyName ? (

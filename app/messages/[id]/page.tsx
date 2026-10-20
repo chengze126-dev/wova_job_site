@@ -7,7 +7,6 @@ import { RefreshOnInterval } from "@/components/refresh-on-interval";
 import { canSendDirectMessage, markConversationRead } from "@/app/actions/messages";
 import { isOnline } from "@/lib/presence";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { OnlineBadge } from "@/components/online-badge";
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,7 +27,12 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   }
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
   if (!other) notFound();
-  const canSend = (await canSendDirectMessage(user, other)).ok;
+  const receivedFromClient =
+    user.role === "TALENT" &&
+    other.role === "CLIENT" &&
+    (conversation.messages || []).some((message) => message.senderId === other.id);
+  const canSend =
+    receivedFromClient || (await canSendDirectMessage(user, other, id)).ok;
   await markConversationRead(id);
 
   return (
@@ -40,14 +44,11 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           src={other.avatarUrl}
           size={48}
           badge={other.talentBadge}
-          online={isOnline(other.lastSeenAt)}
+          presence={isOnline(other.lastSeenAt)}
         />
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-muted">Direct message</p>
-          <h1 className="font-display flex flex-wrap items-center gap-2 text-3xl">
-            {other.name}
-            <OnlineBadge lastSeenAt={other.lastSeenAt} />
-          </h1>
+          <h1 className="font-display text-3xl">{other.name}</h1>
           <p className="text-sm text-muted">{other.companyName || other.email}</p>
         </div>
       </div>

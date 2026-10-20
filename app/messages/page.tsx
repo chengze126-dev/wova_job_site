@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { isOnline } from "@/lib/presence";
 import { ProfileAvatar } from "@/components/profile-avatar";
-import { OnlineBadge } from "@/components/online-badge";
 
 export default async function MessagesPage() {
   const user = await getCurrentUser();
@@ -44,14 +43,11 @@ export default async function MessagesPage() {
                       src={other?.avatarUrl}
                       size={44}
                       badge={other?.talentBadge}
-                      online={isOnline(other?.lastSeenAt)}
+                      presence={isOnline(other?.lastSeenAt)}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="flex min-w-0 items-center gap-2 font-medium">
-                          <span className="truncate">{other?.name}</span>
-                          <OnlineBadge lastSeenAt={other?.lastSeenAt} compact />
-                        </p>
+                        <p className="truncate font-medium">{other?.name}</p>
                         <div className="flex shrink-0 items-center gap-2">
                           {last ? <p className="text-xs text-muted">{formatDate(last.createdAt)}</p> : null}
                           {unread > 0 ? (

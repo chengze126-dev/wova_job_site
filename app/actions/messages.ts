@@ -12,19 +12,23 @@ export async function clientHasMessagedTalent(clientId: string, talentId: string
     where: { userAId_userBId: pair },
   });
   if (!convo) return false;
-  const fromClient = await prisma.message.countFrom({ conversationId: convo.id, senderId: clientId });
-  return fromClient > 0;
+  return prisma.message.existsFrom({ conversationId: convo.id, senderId: clientId });
 }
 
 export async function canSendDirectMessage(
   from: { id: string; role: string },
   to: { id: string; role: string },
+  conversationId?: string,
 ) {
   if (from.id === to.id) return { ok: false, error: "You cannot message yourself." };
   if (from.role === "ADMIN") return { ok: true };
   if (from.role === "CLIENT" && to.role === "TALENT") return { ok: true };
   if (from.role === "TALENT" && to.role === "CLIENT") {
-    if (await clientHasMessagedTalent(to.id, from.id)) return { ok: true };
+    if (conversationId) {
+      if (await prisma.message.existsFrom({ conversationId, senderId: to.id })) return { ok: true };
+    } else if (await clientHasMessagedTalent(to.id, from.id)) {
+      return { ok: true };
+    }
     return { ok: false, error: "You can reply after this client messages you first." };
   }
   return { ok: false, error: "Only the admin can message every client and developer." };
@@ -68,7 +72,7 @@ export async function sendMessage(conversationId: string, formData: FormData) {
   const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
   const other = await prisma.user.findUnique({ where: { id: otherUserId } });
   if (!other) return { error: "User not found." };
-  const allowed = await canSendDirectMessage(user, other);
+  const allowed = await canSendDirectMessage(user, other, conversationId);
   if (!allowed.ok) return { error: allowed.error };
 
   await prisma.message.create({

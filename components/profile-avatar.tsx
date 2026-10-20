@@ -9,14 +9,14 @@ export function ProfileAvatar({
   src,
   size = 110,
   badge = false,
-  online = false,
+  presence,
 }: {
   name: string;
   src?: string | null;
   size?: number;
   badge?: boolean;
   badgeTone?: "light" | "dark";
-  online?: boolean;
+  presence?: boolean;
 }) {
   const letters = initials(name) || "W";
   const badgeSize = Math.max(18, Math.round(size * 0.38));
@@ -62,14 +62,14 @@ export function ProfileAvatar({
           <TalentLogo size={badgeSize} />
         </span>
       ) : null}
-      {online ? (
+      {presence !== undefined ? (
         <span
-          className={`pointer-events-none absolute rounded-full border-2 border-cream bg-[#14a800] ${
-            badge ? "-bottom-0.5 -left-0.5" : "-bottom-0.5 -right-0.5"
-          }`}
+          className={`pointer-events-none absolute rounded-full border-2 border-cream ${
+            presence ? "bg-[#14a800]" : "bg-[#c4c4c4]"
+          } ${badge ? "-bottom-0.5 -left-0.5" : "-bottom-0.5 -right-0.5"}`}
           style={{ width: Math.max(10, Math.round(size * 0.22)), height: Math.max(10, Math.round(size * 0.22)) }}
-          title="Online"
-          aria-label="Online"
+          title={presence ? "Online" : "Offline"}
+          aria-label={presence ? "Online" : "Offline"}
         />
       ) : null}
     </span>

@@ -11,7 +11,6 @@ import { updateApplicationStatus } from "@/app/actions/jobs";
 import { canSendDirectMessage, startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 import { isOnline } from "@/lib/presence";
-import { OnlineBadge } from "@/components/online-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -143,11 +142,10 @@ async function renderDashboard() {
                         src={app.talent?.avatarUrl}
                         size={28}
                         badge={app.talent?.talentBadge}
-                        online={isOnline(app.talent?.lastSeenAt)}
+                        presence={isOnline(app.talent?.lastSeenAt)}
                       />
                       {app.talent?.name || "Talent"}
                       {app.talent?.talentBadge ? <TalentBadge compact /> : null}
-                      <OnlineBadge lastSeenAt={app.talent?.lastSeenAt} compact />
                     </p>
                     <p className="text-sm text-muted">
                       {app.job?.title || "Job"} · {app.status} · {formatDate(app.createdAt)}

@@ -11,7 +11,6 @@ import { canSendDirectMessage, startConversation } from "@/app/actions/messages"
 import { SubmitButton } from "@/components/submit-button";
 import { ApplyForm } from "@/components/apply-form";
 import { isOnline } from "@/lib/presence";
-import { OnlineBadge } from "@/components/online-badge";
 
 export default async function JobDetailPage({
   params,
@@ -122,11 +121,10 @@ export default async function JobDetailPage({
                         src={app.talent.avatarUrl}
                         size={28}
                         badge={app.talent.talentBadge}
-                        online={isOnline(app.talent.lastSeenAt)}
+                        presence={isOnline(app.talent.lastSeenAt)}
                       />
                       {app.talent.name}
                       {app.talent.talentBadge ? <TalentBadge compact /> : null}
-                      <OnlineBadge lastSeenAt={app.talent.lastSeenAt} compact />
                     </Link>
                     <span className="text-xs text-muted">{app.status}</span>
                   </div>
@@ -173,8 +171,8 @@ export default async function JobDetailPage({
         <p className="mt-1 text-xs text-muted">{job.budgetType === "hourly" ? "Hourly" : "Fixed price"}</p>
         <hr className="my-4 border-line" />
         <p className="flex items-center gap-2 text-sm">
+          <ProfileAvatar name={job.client.name} src={job.client.avatarUrl} size={28} presence={isOnline(job.client.lastSeenAt)} />
           {job.client.name}
-          <OnlineBadge lastSeenAt={job.client.lastSeenAt} compact />
         </p>
         <p className="text-xs text-muted">{job.client.companyLocation}</p>
         {job.status === "OPEN" ? (

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { MessageComposer } from "@/components/message-composer";
-import { formatDate } from "@/lib/utils";
+import { MessageItem } from "@/components/message-item";
 import { RefreshOnInterval } from "@/components/refresh-on-interval";
 import { canSendDirectMessage, markConversationRead } from "@/app/actions/messages";
 import { isOnline } from "@/lib/presence";
@@ -52,21 +52,16 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         </div>
       </div>
       <div className="mt-6 flex max-h-[55vh] flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
-        {conversation.messages?.map((message) => {
-          const mine = message.senderId === user.id;
-          return (
-            <div key={message.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-              <div
-                className={`w-fit max-w-[80%] rounded-[22px] px-4 py-2 text-sm leading-6 whitespace-pre-wrap break-words ${
-                  mine ? "bg-[#7ee2c4] text-[#0b1f17]" : "bg-[#dce8e3] text-[#0b1f17] dark:bg-[#3d5248] dark:text-[#f3f6f4]"
-                }`}
-              >
-                {message.content}
-              </div>
-              <p className="mt-1 text-[11px] text-muted">{formatDate(message.createdAt)}</p>
-            </div>
-          );
-        })}
+        {conversation.messages?.map((message) => (
+          <MessageItem
+            key={message.id}
+            id={message.id}
+            content={message.content}
+            createdAt={message.createdAt}
+            editedAt={message.editedAt}
+            mine={message.senderId === user.id}
+          />
+        ))}
       </div>
       {canSend ? (
         <MessageComposer conversationId={id} />

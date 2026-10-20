@@ -90,6 +90,45 @@ export async function sendMessage(conversationId: string, formData: FormData) {
   return { ok: true };
 }
 
+async function ownMessage(messageId: string) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Sign in first." as const };
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) return { error: "Message not found." as const };
+  if (message.senderId !== user.id) return { error: "You can only change your own messages." as const };
+  const conversation = await prisma.conversation.findUnique({ where: { id: message.conversationId } });
+  if (!conversation) return { error: "Conversation not found." as const };
+  if (conversation.userAId !== user.id && conversation.userBId !== user.id && user.role !== "ADMIN") {
+    return { error: "You are not in this conversation." as const };
+  }
+  return { user, message, conversation };
+}
+
+export async function editMessage(messageId: string, formData: FormData) {
+  const loaded = await ownMessage(messageId);
+  if ("error" in loaded) return loaded;
+  const content = String(formData.get("content") || "").trim();
+  if (!content) return { error: "Write a message." };
+  if (content.length > 4000) return { error: "Message is too long." };
+  await prisma.message.update({
+    where: { id: messageId },
+    data: { content, editedAt: new Date() },
+  });
+  revalidatePath(`/messages/${loaded.message.conversationId}`);
+  revalidatePath("/messages");
+  return { ok: true as const };
+}
+
+export async function deleteMessage(messageId: string) {
+  const loaded = await ownMessage(messageId);
+  if ("error" in loaded) return loaded;
+  await prisma.message.delete({ where: { id: messageId } });
+  revalidatePath(`/messages/${loaded.message.conversationId}`);
+  revalidatePath("/messages");
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
 export async function markConversationRead(conversationId: string) {
   const user = await getCurrentUser();
   if (!user) return;

@@ -202,6 +202,7 @@ async function migrate(instance: SqlDatabase) {
       senderId TEXT NOT NULL,
       content TEXT NOT NULL,
       createdAt TEXT NOT NULL,
+      editedAt TEXT,
       FOREIGN KEY (conversationId) REFERENCES Conversation(id) ON DELETE CASCADE,
       FOREIGN KEY (senderId) REFERENCES User(id) ON DELETE CASCADE
     );
@@ -340,6 +341,7 @@ async function ensureLiveColumns(instance: SqlDatabase) {
     "ALTER TABLE User ADD COLUMN lastSeenAt TEXT",
     "ALTER TABLE Conversation ADD COLUMN lastReadA TEXT",
     "ALTER TABLE Conversation ADD COLUMN lastReadB TEXT",
+    "ALTER TABLE Message ADD COLUMN editedAt TEXT",
   ]) {
     try {
       await instance.exec(sql);
@@ -537,6 +539,17 @@ function mapApplication(row: Dict) {
     attachmentUrl: (row.attachmentUrl as string) ?? null,
     attachmentName: (row.attachmentName as string) ?? null,
     createdAt: new Date(String(row.createdAt)),
+  };
+}
+
+function mapMessage(row: Dict) {
+  return {
+    id: String(row.id),
+    conversationId: String(row.conversationId),
+    senderId: String(row.senderId),
+    content: String(row.content),
+    createdAt: new Date(String(row.createdAt)),
+    editedAt: toDate(row.editedAt),
   };
 }
 
@@ -988,13 +1001,7 @@ export const prisma = {
         const order = (include.messages as Dict).orderBy as Dict | undefined;
         const dir = order?.createdAt === "asc" ? "ASC" : "DESC";
         const sql = `SELECT * FROM Message WHERE conversationId = ? ORDER BY createdAt ${dir} ${take ? `LIMIT ${take}` : ""}`;
-        messages = (await qall(sql, convo.id) as Dict[]).map((m) => ({
-          id: String(m.id),
-          conversationId: String(m.conversationId),
-          senderId: String(m.senderId),
-          content: String(m.content),
-          createdAt: new Date(String(m.createdAt)),
-        }));
+        messages = (await qall(sql, convo.id) as Dict[]).map((m) => mapMessage(m));
       }
       return { ...convo, userA, userB, messages };
     },
@@ -1053,10 +1060,29 @@ export const prisma = {
     },
   },
   message: {
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = (await qget("SELECT * FROM Message WHERE id = ?", where.id)) as Dict | undefined;
+      return row ? mapMessage(row) : null;
+    },
     async create({ data }: { data: Dict }) {
       const messageId = id();
       await qrun("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)", messageId, data.conversationId, data.senderId, data.content, now());
-      return { id: messageId, ...data, createdAt: new Date() };
+      return { id: messageId, ...data, createdAt: new Date(), editedAt: null };
+    },
+    async update({ where, data }: { where: { id: string }; data: Dict }) {
+      const current = await this.findUnique({ where });
+      if (!current) return null;
+      const content = data.content !== undefined ? String(data.content) : current.content;
+      const editedAt = data.editedAt ? new Date(data.editedAt as Date | string).toISOString() : now();
+      try {
+        await qrun("UPDATE Message SET content = ?, editedAt = ? WHERE id = ?", content, editedAt, where.id);
+      } catch {
+        await qrun("UPDATE Message SET content = ? WHERE id = ?", content, where.id);
+      }
+      return this.findUnique({ where });
+    },
+    async delete({ where }: { where: { id: string } }) {
+      await qrun("DELETE FROM Message WHERE id = ?", where.id);
     },
     async existsFrom({ conversationId, senderId }: { conversationId: string; senderId: string }) {
       const row = (await qget(

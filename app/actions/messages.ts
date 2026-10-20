@@ -6,13 +6,13 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { conversationPair } from "@/lib/utils";
 
-export async function clientHasMessagedTalent(clientId: string, talentId: string) {
-  const pair = conversationPair(clientId, talentId);
+export async function hasReceivedFrom(senderId: string, recipientId: string) {
+  const pair = conversationPair(senderId, recipientId);
   const convo = await prisma.conversation.findUnique({
     where: { userAId_userBId: pair },
   });
   if (!convo) return false;
-  return prisma.message.existsFrom({ conversationId: convo.id, senderId: clientId });
+  return prisma.message.existsFrom({ conversationId: convo.id, senderId });
 }
 
 export async function canSendDirectMessage(
@@ -23,13 +23,14 @@ export async function canSendDirectMessage(
   if (from.id === to.id) return { ok: false, error: "You cannot message yourself." };
   if (from.role === "ADMIN") return { ok: true };
   if (from.role === "CLIENT" && to.role === "TALENT") return { ok: true };
-  if (from.role === "TALENT" && to.role === "CLIENT") {
+  if (from.role === "TALENT" && (to.role === "CLIENT" || to.role === "ADMIN")) {
     if (conversationId) {
       if (await prisma.message.existsFrom({ conversationId, senderId: to.id })) return { ok: true };
-    } else if (await clientHasMessagedTalent(to.id, from.id)) {
+    } else if (await hasReceivedFrom(to.id, from.id)) {
       return { ok: true };
     }
-    return { ok: false, error: "You can reply after this client messages you first." };
+    const who = to.role === "ADMIN" ? "admin" : "client";
+    return { ok: false, error: `You can reply after this ${who} messages you first.` };
   }
   return { ok: false, error: "Only the admin can message every client and developer." };
 }

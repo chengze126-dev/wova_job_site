@@ -27,12 +27,11 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   }
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
   if (!other) notFound();
-  const receivedFromClient =
+  const receivedFirst =
     user.role === "TALENT" &&
-    other.role === "CLIENT" &&
+    (other.role === "CLIENT" || other.role === "ADMIN") &&
     (conversation.messages || []).some((message) => message.senderId === other.id);
-  const canSend =
-    receivedFromClient || (await canSendDirectMessage(user, other, id)).ok;
+  const canSend = receivedFirst || (await canSendDirectMessage(user, other, id)).ok;
   await markConversationRead(id);
 
   return (
@@ -69,7 +68,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         <MessageComposer conversationId={id} />
       ) : (
         <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          You can reply after this client messages you first.
+          You can reply after this {other.role === "ADMIN" ? "admin" : "client"} messages you first.
         </p>
       )}
     </div>

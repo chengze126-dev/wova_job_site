@@ -3,23 +3,35 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TalentBadge } from "@/components/badges";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatMoney } from "@/lib/utils";
 import { isAdminEmail } from "@/lib/admin";
 import { AdminLiveSkillMonitor } from "@/components/admin-live-skill-monitor";
 import { startConversation } from "@/app/actions/messages";
+import { payoutAvailableBalance } from "@/app/actions/admin-payouts";
 import { SubmitButton } from "@/components/submit-button";
+import { getStripeUsdBalance, stripeEnabled } from "@/lib/stripe";
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payout?: string; payout_error?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "ADMIN" || !isAdminEmail(user.email)) redirect("/dashboard");
 
-  const [clients, talents, jobs, attempts] = await Promise.all([
+  const params = await searchParams;
+  const [clients, talents, jobs, attempts, purchases, stripeBalance] = await Promise.all([
     prisma.user.findMany({ where: { role: "CLIENT" }, orderBy: { createdAt: "desc" } }),
     prisma.user.findMany({ where: { role: "TALENT" }, orderBy: { createdAt: "desc" } }),
     prisma.job.findMany({ include: { client: true, _count: { select: { applications: true } } }, orderBy: { createdAt: "desc" } }),
     prisma.skillAttempt.findMany({ include: { talent: true }, orderBy: { startedAt: "desc" } }),
+    prisma.connectPurchase.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
+    getStripeUsdBalance(),
   ]);
+  const paidPurchases = purchases.filter((purchase) => purchase.status === "completed");
+  const paidCents = paidPurchases.reduce((sum, purchase) => sum + purchase.amountCents, 0);
+  const talentById = new Map(talents.map((talent) => [talent.id, talent]));
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12">
@@ -29,6 +41,91 @@ export default async function AdminPage() {
         Open any client or developer profile and send a DM. {clients.length} clients · {talents.length}{" "}
         talents · {jobs.length} jobs.
       </p>
+
+      <section className="mt-10">
+        <h2 className="font-display text-3xl">Connect sales</h2>
+        <p className="mt-1 text-sm text-muted">
+          When a developer buys connects, Stripe charges their card into the Wova Stripe account. Send available
+          balance to the bank you added in Stripe.
+        </p>
+        {!stripeEnabled() ? (
+          <p className="mt-3 rounded-2xl border border-line bg-cream p-4 text-sm text-muted">
+            Set STRIPE_SECRET_KEY on Vercel to collect real payments. Until then, local buys are demo credits only.
+          </p>
+        ) : null}
+        {params.payout ? (
+          <p className="mt-3 rounded-xl bg-pine/10 px-4 py-3 text-sm text-pine">
+            Payout sent. Stripe will deposit it to your bank, usually in 1–3 business days.
+          </p>
+        ) : null}
+        {params.payout_error ? (
+          <p className="mt-3 rounded-xl bg-copper/10 px-4 py-3 text-sm text-copper-dark">{params.payout_error}</p>
+        ) : null}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-line bg-cream p-4">
+            <p className="text-xs uppercase tracking-wider text-muted">Completed on Wova</p>
+            <p className="mt-1 text-2xl font-semibold">{formatMoney(paidCents)}</p>
+            <p className="mt-1 text-xs text-muted">{paidPurchases.length} paid packs</p>
+          </div>
+          <div className="rounded-2xl border border-line bg-cream p-4">
+            <p className="text-xs uppercase tracking-wider text-muted">Stripe available</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {stripeBalance ? formatMoney(stripeBalance.availableCents) : "—"}
+            </p>
+            <p className="mt-1 text-xs text-muted">Ready to send to your bank</p>
+          </div>
+          <div className="rounded-2xl border border-line bg-cream p-4">
+            <p className="text-xs uppercase tracking-wider text-muted">Stripe pending</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {stripeBalance ? formatMoney(stripeBalance.pendingCents) : "—"}
+            </p>
+            <p className="mt-1 text-xs text-muted">New charges waiting on Stripe</p>
+          </div>
+        </div>
+        <form action={payoutAvailableBalance} className="mt-4">
+          <SubmitButton>Send available balance to my bank</SubmitButton>
+        </form>
+        {purchases.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">No connect purchases yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-cream">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="p-3">Developer</th>
+                  <th className="p-3">Pack</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases.map((purchase) => {
+                  const talent = talentById.get(purchase.talentId);
+                  return (
+                    <tr key={purchase.id} className="border-t border-line/70">
+                      <td className="p-3">
+                        {talent ? (
+                          <>
+                            <span className="font-medium">{talent.name}</span>
+                            <div className="text-xs text-muted">{talent.email}</div>
+                          </>
+                        ) : (
+                          purchase.talentId
+                        )}
+                      </td>
+                      <td className="p-3">{purchase.connects} connects</td>
+                      <td className="p-3">{formatMoney(purchase.amountCents)}</td>
+                      <td className="p-3">{purchase.status}</td>
+                      <td className="p-3">{formatDate(purchase.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <AdminLiveSkillMonitor />
 

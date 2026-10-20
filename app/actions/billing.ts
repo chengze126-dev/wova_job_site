@@ -85,6 +85,7 @@ export async function buyConnects() {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: user.email,
+    submit_type: "pay",
     line_items: [
       {
         quantity: 1,
@@ -98,6 +99,9 @@ export async function buyConnects() {
         },
       },
     ],
+    payment_intent_data: {
+      description: `Wova connects for ${user.email}`,
+    },
     metadata: { userId: user.id, connects: String(CONNECT_PACK.connects) },
     success_url: `${origin}/connects?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/connects?canceled=1`,

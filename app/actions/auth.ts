@@ -256,10 +256,12 @@ export async function resetPassword(formData: FormData) {
     if (!user || user.email !== String(payload.email || "")) {
       return { error: "That link is invalid. Request a new reset email." };
     }
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash: await hash(password, 10) },
     });
+    if (updated) await rememberSignup(snapshotFromUser(updated));
+    await destroySession();
     return { ok: true as const };
   } catch {
     return { error: "That link expired. Request a new reset email." };

@@ -643,12 +643,14 @@ export const prisma = {
         updatedAt: new Date(),
       };
       await qrun(`UPDATE User SET
+            passwordHash=?,
             name=?, country=?, phone=?, phoneVerified=?, phoneOtpHash=?, phoneOtpExpires=?,
             emailVerified=?, emailOtpHash=?, emailOtpExpires=?, bio=?, updatedAt=?,
             linkedinUrl=?, resumeUrl=?, avatarUrl=?, title=?, hourlyRate=?, skills=?, extras=?, skillTestPassed=?, talentBadge=?, connects=?, onboardingDone=?,
             companyName=?, companySize=?, companyIndustry=?, companyWebsite=?, companyLocation=?,
             stripeCustomerId=?, paymentConnected=?, introVideoUrl=?, introVideoMime=?, introVideoSeconds=?, introVideoAt=?
-          WHERE id=?`, next.name,
+          WHERE id=?`, next.passwordHash,
+          next.name,
           next.country,
           next.phone,
           toBool(next.phoneVerified),

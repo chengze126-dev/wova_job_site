@@ -32,21 +32,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const canSend = receivedFirst || (await canSendDirectMessage(user, other, id)).ok;
   await markConversationRead(id);
 
-  const threads = await prisma.conversation.findMany({
-    where: { OR: [{ userAId: user.id }, { userBId: user.id }] },
-    include: { userA: true, userB: true },
-  });
-  const forwardTargets = threads
-    .filter((thread) => thread && thread.id !== id)
-    .map((thread) => {
-      const person = thread.userAId === user.id ? thread.userB : thread.userA;
-      return {
-        id: thread.id,
-        name: person?.name || "User",
-        avatarUrl: person?.avatarUrl || null,
-      };
-    });
-
   return (
     <div className="mx-auto flex max-w-3xl flex-col px-5 py-10">
       <div className="flex items-center gap-3">
@@ -68,6 +53,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         currentUserId={user.id}
         canSend={canSend}
         waitCopy={`You can reply after this ${other.role === "ADMIN" ? "admin" : "client"} messages you first.`}
+        otherName={other.name}
         messages={(conversation.messages || []).map((message) => ({
           id: message.id,
           senderId: message.senderId,
@@ -75,7 +61,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           createdAt: message.createdAt,
           editedAt: message.editedAt,
         }))}
-        forwardTargets={forwardTargets}
       />
     </div>
   );

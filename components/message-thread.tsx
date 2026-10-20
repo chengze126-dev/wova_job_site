@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Forward, Pencil, Trash2 } from "lucide-react";
 import { deleteMessage, editMessage, forwardMessage, sendMessage } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
-import { ProfileAvatar } from "@/components/profile-avatar";
 import { RefreshOnInterval } from "@/components/refresh-on-interval";
 import { formatTime } from "@/lib/utils";
 
@@ -17,28 +15,21 @@ type ThreadMessage = {
   editedAt?: Date | string | null;
 };
 
-type ForwardTarget = {
-  id: string;
-  name: string;
-  avatarUrl?: string | null;
-};
-
 export function MessageThread({
   conversationId,
   currentUserId,
   canSend,
   waitCopy,
+  otherName,
   messages,
-  forwardTargets,
 }: {
   conversationId: string;
   currentUserId: string;
   canSend: boolean;
   waitCopy: string;
+  otherName: string;
   messages: ThreadMessage[];
-  forwardTargets: ForwardTarget[];
 }) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -210,40 +201,29 @@ export function MessageThread({
           </div>
         </form>
       ) : forwarding && selected ? (
-        <div className="mt-4 space-y-3 rounded-2xl border border-line bg-paper p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Forward message</p>
+        <form
+          action={async () => {
+            const result = await forwardMessage(selected.id);
+            if (result && "error" in result) {
+              setError(result.error);
+              return;
+            }
+            setForwarding(false);
+            setSelectedId(null);
+          }}
+          className="mt-4 space-y-3 rounded-2xl border border-line bg-paper p-4"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Forward to {otherName}</p>
           <div className="rounded-[18px] bg-[#dce8e3] px-4 py-2 text-sm leading-6 whitespace-pre-wrap break-words text-[#0b1f17]">
             {selected.content}
           </div>
-          {forwardTargets.length === 0 ? (
-            <p className="text-sm text-muted">No other conversations to forward to yet.</p>
-          ) : (
-            <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-              {forwardTargets.map((target) => (
-                <li key={target.id}>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const result = await forwardMessage(selected.id, target.id);
-                      if (result && "error" in result) {
-                        setError(result.error);
-                        return;
-                      }
-                      if (result && "conversationId" in result) router.push(`/messages/${result.conversationId}`);
-                    }}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-cream"
-                  >
-                    <ProfileAvatar name={target.name} src={target.avatarUrl} size={32} />
-                    <span className="font-medium">{target.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button type="button" onClick={() => setForwarding(false)} className="text-sm text-muted">
-            Cancel
-          </button>
-        </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setForwarding(false)} className="rounded-full px-4 py-2 text-sm text-muted">
+              Cancel
+            </button>
+            <SubmitButton className="!rounded-full !bg-[#14a800] !px-4 !py-2">Forward</SubmitButton>
+          </div>
+        </form>
       ) : canSend ? (
         <form
           ref={formRef}

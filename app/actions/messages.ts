@@ -129,46 +129,40 @@ export async function deleteMessage(messageId: string) {
   return { ok: true as const };
 }
 
-export async function forwardMessage(messageId: string, toConversationId: string) {
+export async function forwardMessage(messageId: string) {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
   const message = await prisma.message.findUnique({ where: { id: messageId } });
   if (!message) return { error: "Message not found." };
 
-  const source = await prisma.conversation.findUnique({ where: { id: message.conversationId } });
-  if (!source) return { error: "Conversation not found." };
-  if (source.userAId !== user.id && source.userBId !== user.id && user.role !== "ADMIN") {
+  const conversation = await prisma.conversation.findUnique({ where: { id: message.conversationId } });
+  if (!conversation) return { error: "Conversation not found." };
+  if (conversation.userAId !== user.id && conversation.userBId !== user.id && user.role !== "ADMIN") {
     return { error: "You are not in this conversation." };
   }
 
-  const target = await prisma.conversation.findUnique({ where: { id: toConversationId } });
-  if (!target) return { error: "Conversation not found." };
-  if (target.userAId !== user.id && target.userBId !== user.id && user.role !== "ADMIN") {
-    return { error: "You are not in that conversation." };
-  }
-
-  const otherUserId = target.userAId === user.id ? target.userBId : target.userAId;
+  const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
   const other = await prisma.user.findUnique({ where: { id: otherUserId } });
   if (!other) return { error: "User not found." };
-  const allowed = await canSendDirectMessage(user, other, toConversationId);
+  const allowed = await canSendDirectMessage(user, other, conversation.id);
   if (!allowed.ok) return { error: allowed.error };
 
   await prisma.message.create({
     data: {
-      conversationId: toConversationId,
+      conversationId: conversation.id,
       senderId: user.id,
       content: `Forwarded:\n${message.content}`,
     },
   });
   await prisma.conversation.update({
-    where: { id: toConversationId },
+    where: { id: conversation.id },
     data: { updatedAt: new Date() },
   });
-  await markConversationRead(toConversationId);
-  revalidatePath(`/messages/${toConversationId}`);
+  await markConversationRead(conversation.id);
+  revalidatePath(`/messages/${conversation.id}`);
   revalidatePath("/messages");
   revalidatePath("/", "layout");
-  return { ok: true as const, conversationId: toConversationId };
+  return { ok: true as const };
 }
 
 export async function markConversationRead(conversationId: string) {

@@ -34,8 +34,8 @@ export default function TermsPage() {
         <h2 className="text-[20px] font-semibold text-ink">Contact</h2>
         <p>
           Questions:{" "}
-          <Link href="/about" className="font-semibold text-[#0db64b] hover:underline">
-            About Wova
+          <Link href="/contact" className="font-semibold text-[#0db64b] hover:underline">
+            Contact Wova
           </Link>
           .
         </p>

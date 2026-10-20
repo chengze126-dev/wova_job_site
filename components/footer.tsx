@@ -4,11 +4,11 @@ const columns = [
   {
     title: "For Clients",
     links: [
-      { href: "/#how-it-works", label: "How to hire" },
+      { href: "/how-to-hire", label: "How to hire" },
       { href: "/talents", label: "Talent Marketplace" },
       { href: "/jobs/new", label: "Post a job" },
-      { href: "/signup?role=CLIENT", label: "Enterprise hiring" },
-      { href: "/talents", label: "Hire worldwide" },
+      { href: "/enterprise", label: "Enterprise hiring" },
+      { href: "/hire-worldwide", label: "Hire worldwide" },
     ],
   },
   {
@@ -18,27 +18,27 @@ const columns = [
       { href: "/jobs", label: "Find freelance jobs" },
       { href: "/skill-test", label: "Skill test" },
       { href: "/connects", label: "Buy connects" },
-      { href: "/#how-it-works", label: "How to find work" },
+      { href: "/how-to-find-work", label: "How to find work" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { href: "/#resources", label: "Help & support" },
-      { href: "/#stories", label: "Success stories" },
-      { href: "/#why-workora", label: "Why Wova" },
-      { href: "/#categories", label: "Browse categories" },
-      { href: "/jobs", label: "Career guidance" },
+      { href: "/help", label: "Help & support" },
+      { href: "/stories", label: "Success stories" },
+      { href: "/why-wova", label: "Why Wova" },
+      { href: "/categories", label: "Browse categories" },
+      { href: "/career-guidance", label: "Career guidance" },
     ],
   },
   {
     title: "Company",
     links: [
       { href: "/about", label: "About us" },
-      { href: "/#resources", label: "Contact us" },
-      { href: "/#why-workora", label: "Trust, safety & security" },
-      { href: "/signup", label: "Careers" },
-      { href: "/admin", label: "Press" },
+      { href: "/contact", label: "Contact us" },
+      { href: "/trust", label: "Trust, safety & security" },
+      { href: "/careers", label: "Careers" },
+      { href: "/press", label: "Press" },
     ],
   },
 ];
@@ -69,8 +69,8 @@ export function Footer() {
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/terms" className="hover:text-footer-fg">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-footer-fg">Privacy Policy</Link>
-            <Link href="/" className="hover:text-footer-fg">Accessibility</Link>
-            <Link href="/" className="hover:text-footer-fg">Sitemap</Link>
+            <Link href="/accessibility" className="hover:text-footer-fg">Accessibility</Link>
+            <Link href="/sitemap" className="hover:text-footer-fg">Sitemap</Link>
           </div>
         </div>
       </div>

@@ -85,12 +85,9 @@ export default function AboutPage() {
             </p>
           </div>
         </div>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/signup?role=TALENT" className="rounded-full bg-[#0db64b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0aa542]">
-            Create a profile
-          </Link>
-          <Link href="/jobs" className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink hover:border-[#0db64b]/40">
-            Browse jobs
+        <div className="mt-6">
+          <Link href="/signup" className="rounded-full bg-[#0db64b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0aa542]">
+            Join Wova
           </Link>
         </div>
       </section>

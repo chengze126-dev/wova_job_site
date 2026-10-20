@@ -1091,6 +1091,32 @@ export const prisma = {
         // column may not exist yet
       }
     },
+    async bumpAfterSend(conversationId: string, userId: string) {
+      const current = await this.findUnique({ where: { id: conversationId } });
+      if (!current) return;
+      const stamp = now();
+      try {
+        if (current.userAId === userId) {
+          await qrun(
+            "UPDATE Conversation SET updatedAt = ?, lastReadA = ?, typingAtA = NULL WHERE id = ?",
+            stamp,
+            stamp,
+            conversationId,
+          );
+        } else if (current.userBId === userId) {
+          await qrun(
+            "UPDATE Conversation SET updatedAt = ?, lastReadB = ?, typingAtB = NULL WHERE id = ?",
+            stamp,
+            stamp,
+            conversationId,
+          );
+        } else {
+          await qrun("UPDATE Conversation SET updatedAt = ? WHERE id = ?", stamp, conversationId);
+        }
+      } catch {
+        await qrun("UPDATE Conversation SET updatedAt = ? WHERE id = ?", stamp, conversationId);
+      }
+    },
     async deleteMany() {
       await qexec("DELETE FROM Conversation");
     },

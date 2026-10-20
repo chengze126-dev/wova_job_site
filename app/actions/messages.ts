@@ -71,11 +71,13 @@ export async function sendMessage(conversationId: string, formData: FormData) {
     return { error: "You are not in this conversation." };
   }
 
-  const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
-  const other = await prisma.user.findUnique({ where: { id: otherUserId } });
-  if (!other) return { error: "User not found." };
-  const allowed = await canSendDirectMessage(user, other, conversationId);
-  if (!allowed.ok) return { error: allowed.error };
+  if (user.role !== "ADMIN") {
+    const otherUserId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
+    const other = await prisma.user.findUnique({ where: { id: otherUserId } });
+    if (!other) return { error: "User not found." };
+    const allowed = await canSendDirectMessage(user, other, conversationId);
+    if (!allowed.ok) return { error: allowed.error };
+  }
 
   const replyToId = String(formData.get("replyToId") || "").trim() || null;
   if (replyToId) {
@@ -88,15 +90,8 @@ export async function sendMessage(conversationId: string, formData: FormData) {
   await prisma.message.create({
     data: { conversationId, senderId: user.id, content, ...(replyToId ? { replyToId } : {}) },
   });
-  await prisma.conversation.clearTyping(conversationId, user.id);
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { updatedAt: new Date() },
-  });
-  await markConversationRead(conversationId);
+  await prisma.conversation.bumpAfterSend(conversationId, user.id);
   revalidatePath(`/messages/${conversationId}`);
-  revalidatePath("/messages");
-  revalidatePath("/", "layout");
   return { ok: true };
 }
 
@@ -134,8 +129,6 @@ export async function deleteMessage(messageId: string) {
   if ("error" in loaded) return loaded;
   await prisma.message.delete({ where: { id: messageId } });
   revalidatePath(`/messages/${loaded.message.conversationId}`);
-  revalidatePath("/messages");
-  revalidatePath("/", "layout");
   return { ok: true as const };
 }
 

@@ -32,6 +32,7 @@ export function MessageThread({
   messages: ThreadMessage[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
   const lastTypingPing = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -39,6 +40,7 @@ export function MessageThread({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
+  const [pending, setPending] = useState<ThreadMessage[]>([]);
 
   function notifyTyping() {
     const now = Date.now();
@@ -74,10 +76,29 @@ export function MessageThread({
     };
   }, [conversationId]);
 
-  const byId = useMemo(() => new Map(messages.map((message) => [message.id, message])), [messages]);
+  const visible = useMemo(() => {
+    const extras = pending.filter(
+      (item) => !messages.some((message) => message.senderId === item.senderId && message.content === item.content),
+    );
+    return [...messages, ...extras];
+  }, [messages, pending]);
+
+  useEffect(() => {
+    setPending((list) =>
+      list.filter((item) => !messages.some((message) => message.senderId === item.senderId && message.content === item.content)),
+    );
+  }, [messages]);
+
+  useEffect(() => {
+    const node = threadRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [visible.length, otherTyping]);
+
+  const byId = useMemo(() => new Map(visible.map((message) => [message.id, message])), [visible]);
   const selected = useMemo(
-    () => messages.find((message) => message.id === selectedId) || null,
-    [messages, selectedId],
+    () => visible.find((message) => message.id === selectedId) || null,
+    [visible, selectedId],
   );
   const mineSelected = Boolean(selected && selected.senderId === currentUserId);
 
@@ -129,11 +150,37 @@ export function MessageThread({
     setError("");
   }
 
+  function queueSend(formData: FormData, replyToId?: string | null) {
+    const content = String(formData.get("content") || "").trim();
+    if (!content) return;
+    const optimistic: ThreadMessage = {
+      id: `local-${Date.now()}`,
+      senderId: currentUserId,
+      content,
+      createdAt: new Date().toISOString(),
+      replyToId: replyToId || null,
+    };
+    setPending((list) => [...list, optimistic]);
+    setError("");
+    formRef.current?.reset();
+    setReplying(false);
+    setSelectedId(null);
+    const snapshot = new FormData();
+    snapshot.set("content", content);
+    if (replyToId) snapshot.set("replyToId", replyToId);
+    void sendMessage(conversationId, snapshot).then((result) => {
+      if (result && "error" in result) {
+        setPending((list) => list.filter((item) => item.id !== optimistic.id));
+        setError(result.error);
+      }
+    });
+  }
+
   return (
     <>
-      {!editing && !replying ? <RefreshOnInterval seconds={4} /> : null}
-      <div className="mt-6 flex max-h-[55vh] flex-col gap-2 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
-        {messages.map((message) => {
+      {!editing && !replying ? <RefreshOnInterval seconds={2} /> : null}
+      <div ref={threadRef} className="mt-6 flex max-h-[55vh] flex-col gap-2 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
+        {visible.map((message) => {
           const mine = message.senderId === currentUserId;
           const active = selectedId === message.id;
           const quoted = message.replyToId ? byId.get(message.replyToId) : null;
@@ -266,16 +313,8 @@ export function MessageThread({
       ) : replying && selected && canSend ? (
         <form
           ref={formRef}
-          action={async (formData) => {
-            formData.set("replyToId", selected.id);
-            const result = await sendMessage(conversationId, formData);
-            if (result && "error" in result) {
-              setError(result.error);
-              return;
-            }
-            formRef.current?.reset();
-            setReplying(false);
-            setSelectedId(null);
+          action={(formData) => {
+            queueSend(formData, selected.id);
           }}
           className="mt-4 space-y-3 rounded-2xl border border-line bg-paper p-4"
         >
@@ -303,9 +342,8 @@ export function MessageThread({
       ) : canSend ? (
         <form
           ref={formRef}
-          action={async (formData) => {
-            await sendMessage(conversationId, formData);
-            formRef.current?.reset();
+          action={(formData) => {
+            queueSend(formData);
           }}
           className="mt-4 flex gap-2"
         >

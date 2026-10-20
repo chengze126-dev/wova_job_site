@@ -9,23 +9,32 @@ import type { SessionUser } from "@/lib/auth";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { AdminMonitorLink } from "./admin-skill-alert";
+import { MessagesNav } from "./messages-nav";
 
 const AUTH_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"]);
 
-export function Header({ user }: { user: SessionUser | null }) {
+export function Header({ user, unreadCount = 0 }: { user: SessionUser | null; unreadCount?: number }) {
   const pathname = usePathname();
   if (AUTH_PATHS.has(pathname)) return null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-header text-header-fg">
       <div className="mx-auto w-[92%] max-w-[1308px]">
-        <TopNav user={user} />
+        <TopNav user={user} unreadCount={unreadCount} />
       </div>
     </header>
   );
 }
 
-export function TopNav({ user, onDark = false }: { user: SessionUser | null; onDark?: boolean }) {
+export function TopNav({
+  user,
+  onDark = false,
+  unreadCount = 0,
+}: {
+  user: SessionUser | null;
+  onDark?: boolean;
+  unreadCount?: number;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const linkClass = onDark
@@ -80,6 +89,7 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
           ) : null}
           {user ? (
             <>
+              <MessagesNav initialCount={unreadCount} onDark={onDark} />
               <AccountMenu user={user} onDark={onDark} linkClass={linkClass} />
               <Link
                 href={postHref}
@@ -105,6 +115,7 @@ export function TopNav({ user, onDark = false }: { user: SessionUser | null; onD
 
         <div className="ml-auto flex items-center gap-1 md:hidden">
           <ThemeToggle onDark={onDark} />
+          {user ? <MessagesNav initialCount={unreadCount} onDark={onDark} /> : null}
           <button
             type="button"
             className={`flex h-10 w-10 items-center justify-center rounded-[8px] ${onDark ? "text-white" : "text-header-fg"}`}

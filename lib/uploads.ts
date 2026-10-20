@@ -15,6 +15,25 @@ export function isUploadFolder(folder: string): folder is UploadFolder {
   return (UPLOAD_FOLDERS as readonly string[]).includes(folder);
 }
 
+async function toOptimizedImageDataUrl(buffer: Buffer, mimeHint: string) {
+  try {
+    const sharp = (await import("sharp")).default;
+    const out = await sharp(buffer)
+      .rotate()
+      .resize(720, 720, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+    return `data:image/jpeg;base64,${out.toString("base64")}`;
+  } catch {
+    if (buffer.length > 350_000) {
+      throw new Error("photo-too-large");
+    }
+    const mime = mimeHint || "image/jpeg";
+    return `data:${mime};base64,${buffer.toString("base64")}`;
+  }
+}
+
 export function uploadsDir(folder: UploadFolder) {
   if (process.env.VERCEL) {
     switch (folder) {
@@ -99,8 +118,12 @@ export async function savePublicUpload({
 
   // Avatars/portfolio must survive Vercel’s ephemeral disk, so persist in the DB as a data URL.
   if (folder === "avatars" || folder === "portfolio") {
-    const mime = IMAGE_MIME[ext] || file.type || "image/jpeg";
-    return { url: `data:${mime};base64,${buffer.toString("base64")}` };
+    try {
+      const url = await toOptimizedImageDataUrl(buffer, IMAGE_MIME[ext] || file.type || "image/jpeg");
+      return { url };
+    } catch {
+      return { error: "Could not optimize that photo. Try a smaller JPG or PNG." };
+    }
   }
 
   const filename = `${userId}-${Date.now()}${ext}`;

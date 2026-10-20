@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/*": ["./public/uploads/**/*", "./data/**/*", "./.git/**/*"],
   },
-  serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client"],
+  serverExternalPackages: ["node:sqlite", "node:vm", "@libsql/client", "sharp"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
     qualities: [70, 75, 90],

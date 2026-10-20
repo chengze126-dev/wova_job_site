@@ -7,6 +7,7 @@ import { JobCard } from "@/components/job-card";
 import { HomeHero } from "@/components/home-hero";
 import { HomeMore } from "@/components/home-more";
 import { getSession } from "@/lib/auth";
+import { countUnreadMessages } from "@/app/actions/messages";
 
 const HowItWorks = dynamic(
   () => import("@/components/how-it-works").then((mod) => mod.HowItWorks),
@@ -87,7 +88,9 @@ export default function HomePage() {
 }
 
 async function HomeHeroWithSession() {
-  return <HomeHero user={await getSession()} />;
+  const user = await getSession();
+  const unreadCount = user ? await countUnreadMessages(user.id) : 0;
+  return <HomeHero user={user} unreadCount={unreadCount} />;
 }
 
 async function RecommendedJobs() {

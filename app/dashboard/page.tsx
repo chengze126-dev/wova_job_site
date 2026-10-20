@@ -8,8 +8,10 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 import { talentReady } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { updateApplicationStatus } from "@/app/actions/jobs";
-import { startConversation } from "@/app/actions/messages";
+import { canSendDirectMessage, startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
+import { isOnline } from "@/lib/presence";
+import { OnlineBadge } from "@/components/online-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -136,15 +138,27 @@ async function renderDashboard() {
                 <li key={app.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div>
                     <p className="flex items-center gap-2 font-medium">
-                      <ProfileAvatar name={app.talent?.name || "Talent"} src={app.talent?.avatarUrl} size={28} badge={app.talent?.talentBadge} />
+                      <ProfileAvatar
+                        name={app.talent?.name || "Talent"}
+                        src={app.talent?.avatarUrl}
+                        size={28}
+                        badge={app.talent?.talentBadge}
+                        online={isOnline(app.talent?.lastSeenAt)}
+                      />
                       {app.talent?.name || "Talent"}
                       {app.talent?.talentBadge ? <TalentBadge compact /> : null}
+                      <OnlineBadge lastSeenAt={app.talent?.lastSeenAt} compact />
                     </p>
                     <p className="text-sm text-muted">
                       {app.job?.title || "Job"} · {app.status} · {formatDate(app.createdAt)}
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    {app.talent?.id ? (
+                      <form action={startConversation.bind(null, app.talent.id)}>
+                        <button className="rounded-full border border-line px-3 py-1 text-xs">Message</button>
+                      </form>
+                    ) : null}
                     <Link href={`/profile/${app.talent?.id}`} className="rounded-full border border-line px-3 py-1 text-xs">
                       Profile
                     </Link>
@@ -176,6 +190,14 @@ async function renderDashboard() {
     include: { job: { include: { client: true } } },
     orderBy: { createdAt: "desc" },
   });
+  const canMessageByApp = new Map<string, boolean>();
+  await Promise.all(
+    applications.map(async (app) => {
+      const client = app.job?.client;
+      if (!client) return;
+      canMessageByApp.set(app.id, (await canSendDirectMessage(user, client)).ok);
+    }),
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12">
@@ -238,12 +260,12 @@ async function renderDashboard() {
                     {app.job?.client?.companyName || "Client"} · {app.status} · {app.connectsUsed} connects
                   </p>
                 </div>
-                {app.status === "HIRED" && app.job?.clientId ? (
+                {canMessageByApp.get(app.id) && app.job?.clientId ? (
                   <form action={startConversation.bind(null, app.job.clientId)}>
                     <button className="text-sm underline decoration-copper/40">Message client</button>
                   </form>
                 ) : (
-                  <span className="text-xs text-muted">Messaging unlocks after hire</span>
+                  <span className="text-xs text-muted">Wait for the client to message you first</span>
                 )}
               </li>
             ))}

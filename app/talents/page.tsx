@@ -9,6 +9,8 @@ import { COUNTRIES, parseSkills } from "@/lib/constants";
 import { formatHourly } from "@/lib/utils";
 import { formatLocation, skillOverlap, textMatchesQuery } from "@/lib/geo";
 import { parseExtras } from "@/lib/profile-extras";
+import { isOnline } from "@/lib/presence";
+import { OnlineBadge } from "@/components/online-badge";
 
 export default async function TalentsPage({
   searchParams,
@@ -68,7 +70,7 @@ export default async function TalentsPage({
         <h1 className="text-[32px] font-semibold tracking-[-0.03em] text-ink">Talent</h1>
         <p className="mt-2 text-muted">
           Browse developer profiles. Search by name, country, skills, or skill-tested status, then send a direct
-          message. Talent can reply after a contract starts.
+          message. Talent can reply after you send the first message.
         </p>
 
         <form className="mt-6 grid gap-3 rounded-[12px] border border-line bg-cream p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,13 +124,20 @@ export default async function TalentsPage({
                 href={`/profile/${talent.id}`}
                 className="flex gap-4 rounded-[12px] border border-line bg-cream p-5 hover:border-[#14a800]"
               >
-                <ProfileAvatar name={talent.name} src={talent.avatarUrl} size={72} badge={talent.talentBadge} />
+                <ProfileAvatar
+                  name={talent.name}
+                  src={talent.avatarUrl}
+                  size={72}
+                  badge={talent.talentBadge}
+                  online={isOnline(talent.lastSeenAt)}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-ink">
                         {talent.name}
                         {talent.talentBadge ? <TalentBadge compact /> : null}
+                        <OnlineBadge lastSeenAt={talent.lastSeenAt} compact />
                       </h2>
                       <p className="mt-0.5 flex items-center gap-1 text-sm text-muted">
                         <MapPin size={13} />

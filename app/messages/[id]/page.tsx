@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { MessageComposer } from "@/components/message-composer";
 import { formatDate } from "@/lib/utils";
 import { RefreshOnInterval } from "@/components/refresh-on-interval";
-import { canSendDirectMessage } from "@/app/actions/messages";
+import { canSendDirectMessage, markConversationRead } from "@/app/actions/messages";
+import { isOnline } from "@/lib/presence";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { OnlineBadge } from "@/components/online-badge";
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,18 +27,32 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     redirect("/messages");
   }
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
+  if (!other) notFound();
   const canSend = (await canSendDirectMessage(user, other)).ok;
+  await markConversationRead(id);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col px-5 py-10">
       <RefreshOnInterval seconds={4} />
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Direct message</p>
-        <h1 className="font-display text-3xl">{other.name}</h1>
-        <p className="text-sm text-muted">{other.companyName || other.email}</p>
+      <div className="flex items-center gap-3">
+        <ProfileAvatar
+          name={other.name}
+          src={other.avatarUrl}
+          size={48}
+          badge={other.talentBadge}
+          online={isOnline(other.lastSeenAt)}
+        />
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Direct message</p>
+          <h1 className="font-display flex flex-wrap items-center gap-2 text-3xl">
+            {other.name}
+            <OnlineBadge lastSeenAt={other.lastSeenAt} />
+          </h1>
+          <p className="text-sm text-muted">{other.companyName || other.email}</p>
+        </div>
       </div>
       <div className="mt-6 flex max-h-[55vh] flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-cream p-4">
-        {conversation.messages.map((message) => {
+        {conversation.messages?.map((message) => {
           const mine = message.senderId === user.id;
           return (
             <div key={message.id} className={`max-w-[80%] ${mine ? "ml-auto" : ""}`}>
@@ -51,7 +68,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         <MessageComposer conversationId={id} />
       ) : (
         <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          You can reply after a contract starts. Clients can still message you now.
+          You can reply after this client messages you first.
         </p>
       )}
     </div>

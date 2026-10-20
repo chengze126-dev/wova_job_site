@@ -7,6 +7,7 @@ import "./globals.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { getSession } from "@/lib/auth";
+import { countUnreadMessages } from "@/app/actions/messages";
 import { siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import { AdminSkillAlert } from "@/components/admin-skill-alert";
@@ -60,9 +61,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
 async function SessionChrome() {
   const session = await getSession();
+  const unreadCount = session ? await countUnreadMessages(session.id) : 0;
   return (
     <>
-      <Header user={session} />
+      <Header user={session} unreadCount={unreadCount} />
       {session?.role === "ADMIN" ? <AdminSkillAlert /> : null}
     </>
   );

@@ -304,39 +304,39 @@ export async function completeTalentOnboarding(formData: FormData) {
   if (!(avatar instanceof File) || avatar.size === 0) {
     if (!user.avatarUrl) return { error: "Upload a profile photo to continue." };
   }
-  let avatarUrl = user.avatarUrl;
-  if (avatar instanceof File && avatar.size > 0) {
-    const avatarSaved = await savePublicUpload({
-      file: avatar,
-      folder: "avatars",
-      userId: user.id,
-      allowed: [".jpg", ".jpeg", ".png", ".webp"],
-      maxBytes: 5 * 1024 * 1024,
-    });
-    if ("error" in avatarSaved) return { error: avatarSaved.error };
-    avatarUrl = avatarSaved.url;
-  }
-  if (!avatarUrl) return { error: "Upload a profile photo to continue." };
+  const [avatarSaved, resumeSaved] = await Promise.all([
+    avatar instanceof File && avatar.size > 0
+      ? savePublicUpload({
+          file: avatar,
+          folder: "avatars",
+          userId: user.id,
+          allowed: [".jpg", ".jpeg", ".png", ".webp"],
+          maxBytes: 5 * 1024 * 1024,
+        })
+      : Promise.resolve(null),
+    resume instanceof File && resume.size > 0
+      ? savePublicUpload({
+          file: resume,
+          folder: "resumes",
+          userId: user.id,
+          allowed: [".pdf", ".doc", ".docx", ".txt"],
+          maxBytes: 8 * 1024 * 1024,
+        })
+      : Promise.resolve(null),
+  ]);
+  if (avatarSaved && "error" in avatarSaved) return { error: avatarSaved.error };
+  if (resumeSaved && "error" in resumeSaved) return { error: resumeSaved.error };
 
-  let resumeUrl = user.resumeUrl;
-  if (resume instanceof File && resume.size > 0) {
-    const resumeSaved = await savePublicUpload({
-      file: resume,
-      folder: "resumes",
-      userId: user.id,
-      allowed: [".pdf", ".doc", ".docx", ".txt"],
-      maxBytes: 8 * 1024 * 1024,
-    });
-    if ("error" in resumeSaved) return { error: resumeSaved.error };
-    resumeUrl = resumeSaved.url;
-  }
+  const avatarUrl = avatarSaved && "url" in avatarSaved ? avatarSaved.url : user.avatarUrl;
+  const resumeUrl = resumeSaved && "url" in resumeSaved ? resumeSaved.url : user.resumeUrl;
+  if (!avatarUrl) return { error: "Upload a profile photo to continue." };
   if (!resumeUrl) return { error: "Upload your resume to continue." };
 
   const extras = parseExtras(user.extras);
   extras.city = city || extras.city;
   if (githubUrl) extras.githubUrl = githubUrl;
 
-  await prisma.user.update({
+  const saved = await prisma.user.update({
     where: { id: user.id },
     data: {
       linkedinUrl,
@@ -352,7 +352,6 @@ export async function completeTalentOnboarding(formData: FormData) {
       ...(country ? { country } : {}),
     },
   });
-  const saved = await prisma.user.findUnique({ where: { id: user.id } });
   if (saved) await rememberSignup(snapshotFromUser(saved));
 
   redirect(`/profile/${user.id}`);
@@ -376,7 +375,7 @@ export async function completeClientOnboarding(formData: FormData) {
   if (!INDUSTRIES.includes(companyIndustry)) return { error: "Select an industry." };
   if (phone.replace(/\D/g, "").length < 8) return { error: "Enter a valid phone number with country code." };
 
-  await prisma.user.update({
+  const saved = await prisma.user.update({
     where: { id: user.id },
     data: {
       companyName,
@@ -390,7 +389,6 @@ export async function completeClientOnboarding(formData: FormData) {
       ...(country ? { country } : {}),
     },
   });
-  const saved = await prisma.user.findUnique({ where: { id: user.id } });
   if (saved) {
     try {
       await rememberSignup(snapshotFromUser(saved));
@@ -448,8 +446,7 @@ export async function updateProfile(formData: FormData) {
     }
   }
 
-  await prisma.user.update({ where: { id: user.id }, data });
-  const saved = await prisma.user.findUnique({ where: { id: user.id } });
+  const saved = await prisma.user.update({ where: { id: user.id }, data });
   if (saved) {
     try {
       await rememberSignup(snapshotFromUser(saved));

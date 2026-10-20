@@ -6,19 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { conversationPair } from "@/lib/utils";
 
-export async function hasStartedContract(userId: string, otherUserId: string) {
-  const contract = await prisma.application.findFirst({
-    where: {
-      status: "HIRED",
-      OR: [
-        { talentId: userId, job: { clientId: otherUserId } },
-        { talentId: otherUserId, job: { clientId: userId } },
-      ],
-    },
-    select: { id: true },
+export async function clientHasMessagedTalent(clientId: string, talentId: string) {
+  const pair = conversationPair(clientId, talentId);
+  const convo = await prisma.conversation.findUnique({
+    where: { userAId_userBId: pair },
   });
-
-  return Boolean(contract);
+  if (!convo) return false;
+  const fromClient = await prisma.message.countFrom({ conversationId: convo.id, senderId: clientId });
+  return fromClient > 0;
 }
 
 export async function canSendDirectMessage(
@@ -29,8 +24,8 @@ export async function canSendDirectMessage(
   if (from.role === "ADMIN") return { ok: true };
   if (from.role === "CLIENT" && to.role === "TALENT") return { ok: true };
   if (from.role === "TALENT" && to.role === "CLIENT") {
-    if (await hasStartedContract(from.id, to.id)) return { ok: true };
-    return { ok: false, error: "You can message this client after a contract starts." };
+    if (await clientHasMessagedTalent(to.id, from.id)) return { ok: true };
+    return { ok: false, error: "You can reply after this client messages you first." };
   }
   return { ok: false, error: "Only the admin can message every client and developer." };
 }
@@ -53,6 +48,7 @@ export async function startConversation(otherUserId: string) {
   if (existing) redirect(`/messages/${existing.id}`);
 
   const created = await prisma.conversation.create({ data: pair });
+  if (!created) return { error: "Could not start conversation." };
   redirect(`/messages/${created.id}`);
 }
 
@@ -82,6 +78,41 @@ export async function sendMessage(conversationId: string, formData: FormData) {
     where: { id: conversationId },
     data: { updatedAt: new Date() },
   });
+  await markConversationRead(conversationId);
   revalidatePath(`/messages/${conversationId}`);
+  revalidatePath("/messages");
+  revalidatePath("/", "layout");
   return { ok: true };
+}
+
+export async function markConversationRead(conversationId: string) {
+  const user = await getCurrentUser();
+  if (!user) return;
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) return;
+  if (conversation.userAId !== user.id && conversation.userBId !== user.id) return;
+  const stamp = new Date();
+  if (conversation.userAId === user.id) {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastReadA: stamp },
+    });
+  } else {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastReadB: stamp },
+    });
+  }
+}
+
+export async function countUnreadMessages(userId: string) {
+  return prisma.message.unreadCount(userId);
+}
+
+export async function pingPresence() {
+  const user = await getCurrentUser();
+  if (!user) return { unread: 0 };
+  await prisma.user.touchLastSeen(user.id);
+  const unread = await prisma.message.unreadCount(user.id);
+  return { unread };
 }

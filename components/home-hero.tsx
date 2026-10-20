@@ -11,7 +11,7 @@ const features = [
   { title: "Helpful Resources", body: "Career guidance", Icon: BookIcon },
 ];
 
-export function HomeHero({ user }: { user: SessionUser | null }) {
+export function HomeHero({ user, unreadCount = 0 }: { user: SessionUser | null; unreadCount?: number }) {
   return (
     <>
       <section className="relative min-h-[448px] overflow-hidden rounded-t-[34px] bg-[#000508] text-white max-md:min-h-0 max-md:rounded-none">
@@ -26,7 +26,7 @@ export function HomeHero({ user }: { user: SessionUser | null }) {
 
         <div className="relative mx-auto w-[92%] max-w-[1308px]">
           <div className="relative z-30">
-            <TopNav user={user} onDark />
+            <TopNav user={user} onDark unreadCount={unreadCount} />
           </div>
 
           <div className="relative z-20 pb-0 pt-[18px] lg:pb-8 lg:pt-[27px]">

@@ -5,6 +5,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { startConversation, canSendDirectMessage } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 import { TalentProfile } from "@/components/talent-profile";
+import { isOnline } from "@/lib/presence";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { OnlineBadge } from "@/components/online-badge";
 
 export default async function PublicProfilePage({
   params,
@@ -49,7 +52,15 @@ export default async function PublicProfilePage({
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
       <p className="text-xs uppercase tracking-[0.24em] text-muted">Client</p>
-      <h1 className="font-display mt-2 text-4xl">{profile.name}</h1>
+      <div className="mt-2 flex items-center gap-3">
+        <ProfileAvatar name={profile.name} src={profile.avatarUrl} size={56} online={isOnline(profile.lastSeenAt)} />
+        <div>
+          <h1 className="font-display flex flex-wrap items-center gap-2 text-4xl">
+            {profile.name}
+            <OnlineBadge lastSeenAt={profile.lastSeenAt} />
+          </h1>
+        </div>
+      </div>
       {profile.companyName ? (
         <p className="mt-2 text-muted">
           {profile.companyName} · {profile.companySize} · {profile.companyIndustry}
@@ -61,7 +72,7 @@ export default async function PublicProfilePage({
           <SubmitButton>Send a DM</SubmitButton>
         </form>
       ) : viewer && !isSelf && viewer.role === "TALENT" ? (
-        <p className="mt-6 text-sm text-muted">You can message this client after a contract starts.</p>
+        <p className="mt-6 text-sm text-muted">You can reply after this client messages you first.</p>
       ) : null}
       {isSelf ? (
         <Link

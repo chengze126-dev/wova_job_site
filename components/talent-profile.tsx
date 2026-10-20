@@ -7,6 +7,8 @@ import { parseExtras } from "@/lib/profile-extras";
 import { formatCompactUsd, formatDate, formatHourly, formatMoney } from "@/lib/utils";
 import { TalentLogo } from "@/components/badges";
 import { ProfileAvatar } from "@/components/profile-avatar";
+import { OnlineBadge } from "@/components/online-badge";
+import { isOnline } from "@/lib/presence";
 import { startConversation } from "@/app/actions/messages";
 import {
   addCertification,
@@ -23,6 +25,7 @@ import {
   toggleAvailableNow,
 } from "@/app/actions/profile";
 import { SubmitButton } from "@/components/submit-button";
+import { CompressedFileInput } from "@/components/compressed-file-input";
 import {
   AddPanel,
   LocalTime,
@@ -110,6 +113,7 @@ export function TalentProfile({
                   src={profile.avatarUrl}
                   size={96}
                   badge={profile.talentBadge}
+                  online={isOnline(profile.lastSeenAt)}
                 />
                 {editing ? (
                   <Link
@@ -127,6 +131,7 @@ export function TalentProfile({
                 <h1 className="flex flex-wrap items-center gap-2 text-[28px] font-semibold tracking-[-0.03em]">
                   {profile.name}
                   {profile.phoneVerified ? <BadgeCheck size={20} className="text-[#14a800]" /> : null}
+                  <OnlineBadge lastSeenAt={profile.lastSeenAt} />
                 </h1>
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[14px] text-muted">
                   <MapPin size={14} />
@@ -394,7 +399,7 @@ export function TalentProfile({
                       <form action={addPortfolio} className="space-y-2">
                         <input name="title" placeholder="Project title" className={fieldClass} />
                         <input name="url" placeholder="https://" className={fieldClass} />
-                        <input name="image" type="file" accept="image/*" className="text-sm" />
+                        <CompressedFileInput name="image" accept="image/*" className="text-sm" />
                         <SubmitButton className="!rounded-full !bg-[#14a800] !text-sm">Save</SubmitButton>
                       </form>
                     </AddPanel>

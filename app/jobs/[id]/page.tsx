@@ -7,9 +7,11 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 import { parseSkills, talentReady } from "@/lib/constants";
 import { formatDate, formatMoney } from "@/lib/utils";
 import { closeJob, updateApplicationStatus } from "@/app/actions/jobs";
-import { startConversation } from "@/app/actions/messages";
+import { canSendDirectMessage, startConversation } from "@/app/actions/messages";
 import { SubmitButton } from "@/components/submit-button";
 import { ApplyForm } from "@/components/apply-form";
+import { isOnline } from "@/lib/presence";
+import { OnlineBadge } from "@/components/online-badge";
 
 export default async function JobDetailPage({
   params,
@@ -33,6 +35,8 @@ export default async function JobDetailPage({
   const isOwner = user?.id === job.clientId;
   const myApplication = user ? job.applications.find((a) => a.talentId === user.id) : null;
   const ready = user ? talentReady(user) : { ok: false, reason: "Sign in as talent to apply." };
+  const talentCanMessageClient =
+    user?.role === "TALENT" && job.client ? (await canSendDirectMessage(user, job.client)).ok : false;
 
   return (
     <div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 lg:grid-cols-[1fr_320px]">
@@ -113,9 +117,16 @@ export default async function JobDetailPage({
                 <li key={app.id} className="rounded-2xl border border-line bg-cream p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Link href={`/profile/${app.talent.id}`} className="flex items-center gap-2 font-medium">
-                      <ProfileAvatar name={app.talent.name} src={app.talent.avatarUrl} size={28} badge={app.talent.talentBadge} />
+                      <ProfileAvatar
+                        name={app.talent.name}
+                        src={app.talent.avatarUrl}
+                        size={28}
+                        badge={app.talent.talentBadge}
+                        online={isOnline(app.talent.lastSeenAt)}
+                      />
                       {app.talent.name}
                       {app.talent.talentBadge ? <TalentBadge compact /> : null}
+                      <OnlineBadge lastSeenAt={app.talent.lastSeenAt} compact />
                     </Link>
                     <span className="text-xs text-muted">{app.status}</span>
                   </div>
@@ -133,11 +144,9 @@ export default async function JobDetailPage({
                     <p className="mt-2 text-xs text-muted">No attachment</p>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {app.status === "HIRED" ? (
-                      <form action={startConversation.bind(null, app.talentId)}>
-                        <button className="rounded-full border border-line px-3 py-1 text-xs">Message</button>
-                      </form>
-                    ) : null}
+                    <form action={startConversation.bind(null, app.talentId)}>
+                      <button className="rounded-full border border-line px-3 py-1 text-xs">Message</button>
+                    </form>
                     <form action={updateApplicationStatus.bind(null, app.id, "SHORTLISTED")}>
                       <SubmitButton className="!px-3 !py-1 text-xs">Shortlist</SubmitButton>
                     </form>
@@ -163,7 +172,10 @@ export default async function JobDetailPage({
         </p>
         <p className="mt-1 text-xs text-muted">{job.budgetType === "hourly" ? "Hourly" : "Fixed price"}</p>
         <hr className="my-4 border-line" />
-        <p className="text-sm">{job.client.name}</p>
+        <p className="flex items-center gap-2 text-sm">
+          {job.client.name}
+          <OnlineBadge lastSeenAt={job.client.lastSeenAt} compact />
+        </p>
         <p className="text-xs text-muted">{job.client.companyLocation}</p>
         {job.status === "OPEN" ? (
           <div className="mt-4 space-y-2">
@@ -208,7 +220,7 @@ export default async function JobDetailPage({
         ) : (
           <p className="mt-4 text-sm text-muted">This job is no longer accepting proposals.</p>
         )}
-        {user?.role === "TALENT" && myApplication?.status === "HIRED" ? (
+        {user?.role === "TALENT" && talentCanMessageClient ? (
           <form action={startConversation.bind(null, job.clientId)} className="mt-3">
             <button
               type="submit"
@@ -217,8 +229,8 @@ export default async function JobDetailPage({
               Message client
             </button>
           </form>
-        ) : user?.role === "TALENT" && myApplication && myApplication.status !== "HIRED" ? (
-          <p className="mt-3 text-center text-xs text-muted">Messaging unlocks when your contract starts.</p>
+        ) : user?.role === "TALENT" && myApplication ? (
+          <p className="mt-3 text-center text-xs text-muted">You can reply after this client messages you first.</p>
         ) : null}
       </aside>
     </div>

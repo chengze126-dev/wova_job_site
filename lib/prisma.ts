@@ -17,6 +17,7 @@ async function db() {
   const instance = await getSql();
   if (globalForDb.hirelineMigrated) return instance;
   if (isVercelProduction() && usesRemoteDatabase()) {
+    await ensureLiveColumns(instance);
     globalForDb.hirelineMigrated = true;
     return instance;
   }
@@ -105,7 +106,10 @@ async function ensureCodingQuestions(instance: SqlDatabase) {
 }
 
 async function migrate(instance: SqlDatabase) {
-  if (await schemaIsCurrent(instance)) return;
+  if (await schemaIsCurrent(instance)) {
+    await ensureLiveColumns(instance);
+    return;
+  }
   await instance.exec(`
     CREATE TABLE IF NOT EXISTS User (
       id TEXT PRIMARY KEY,
@@ -145,7 +149,8 @@ async function migrate(instance: SqlDatabase) {
       introVideoUrl TEXT,
       introVideoMime TEXT,
       introVideoSeconds INTEGER,
-      introVideoAt TEXT
+      introVideoAt TEXT,
+      lastSeenAt TEXT
     );
     CREATE TABLE IF NOT EXISTS Job (
       id TEXT PRIMARY KEY,
@@ -185,6 +190,8 @@ async function migrate(instance: SqlDatabase) {
       userBId TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
+      lastReadA TEXT,
+      lastReadB TEXT,
       UNIQUE(userAId, userBId),
       FOREIGN KEY (userAId) REFERENCES User(id) ON DELETE CASCADE,
       FOREIGN KEY (userBId) REFERENCES User(id) ON DELETE CASCADE
@@ -325,6 +332,21 @@ async function migrate(instance: SqlDatabase) {
   }
   await ensureCodingQuestions(instance);
   await ensureAdminUser(instance);
+  await ensureLiveColumns(instance);
+}
+
+async function ensureLiveColumns(instance: SqlDatabase) {
+  for (const sql of [
+    "ALTER TABLE User ADD COLUMN lastSeenAt TEXT",
+    "ALTER TABLE Conversation ADD COLUMN lastReadA TEXT",
+    "ALTER TABLE Conversation ADD COLUMN lastReadB TEXT",
+  ]) {
+    try {
+      await instance.exec(sql);
+    } catch {
+      // column already exists
+    }
+  }
 }
 
 async function ensureSkillAttemptLiveColumns(instance: SqlDatabase) {
@@ -437,6 +459,7 @@ export type User = {
   introVideoMime: string | null;
   introVideoSeconds: number | null;
   introVideoAt: Date | null;
+  lastSeenAt: Date | null;
 };
 
 function mapUser(row: Dict): User {
@@ -479,6 +502,7 @@ function mapUser(row: Dict): User {
     introVideoMime: (row.introVideoMime as string) ?? null,
     introVideoSeconds: row.introVideoSeconds == null || row.introVideoSeconds === "" ? null : Number(row.introVideoSeconds),
     introVideoAt: toDate(row.introVideoAt),
+    lastSeenAt: toDate(row.lastSeenAt),
   };
 }
 
@@ -684,7 +708,14 @@ export const prisma = {
           next.introVideoSeconds == null ? null : Number(next.introVideoSeconds),
           next.introVideoAt ? new Date(next.introVideoAt as Date).toISOString() : null,
           where.id,);
-      return await getUserById(where.id);
+      return next;
+    },
+    async touchLastSeen(userId: string) {
+      try {
+        await qrun("UPDATE User SET lastSeenAt = ? WHERE id = ?", now(), userId);
+      } catch {
+        // column may not exist yet
+      }
     },
     async deleteMany() {
       await qexec("DELETE FROM User");
@@ -946,6 +977,8 @@ export const prisma = {
         userBId: String(row.userBId),
         createdAt: new Date(String(row.createdAt)),
         updatedAt: new Date(String(row.updatedAt)),
+        lastReadA: toDate(row.lastReadA),
+        lastReadB: toDate(row.lastReadB),
       };
       const userA = include?.userA ? await getUserById(convo.userAId) : undefined;
       const userB = include?.userB ? await getUserById(convo.userBId) : undefined;
@@ -982,7 +1015,37 @@ export const prisma = {
       return this.findUnique({ where: { id: convoId } });
     },
     async update({ where, data }: { where: { id: string }; data: Dict }) {
-      await qrun("UPDATE Conversation SET updatedAt = ? WHERE id = ?", data.updatedAt ? new Date(data.updatedAt as Date).toISOString() : now(), where.id);
+      const current = await this.findUnique({ where: { id: where.id } });
+      if (!current) return null;
+      const lastReadA =
+        data.lastReadA !== undefined
+          ? data.lastReadA
+            ? new Date(data.lastReadA as string | Date).toISOString()
+            : null
+          : current.lastReadA
+            ? current.lastReadA.toISOString()
+            : null;
+      const lastReadB =
+        data.lastReadB !== undefined
+          ? data.lastReadB
+            ? new Date(data.lastReadB as string | Date).toISOString()
+            : null
+          : current.lastReadB
+            ? current.lastReadB.toISOString()
+            : null;
+      const onlyRead = data.lastReadA !== undefined || data.lastReadB !== undefined;
+      const updatedAt = data.updatedAt
+        ? new Date(data.updatedAt as Date | string).toISOString()
+        : onlyRead
+          ? current.updatedAt.toISOString()
+          : now();
+      await qrun(
+        "UPDATE Conversation SET updatedAt = ?, lastReadA = ?, lastReadB = ? WHERE id = ?",
+        updatedAt,
+        lastReadA,
+        lastReadB,
+        where.id,
+      );
       return this.findUnique({ where });
     },
     async deleteMany() {
@@ -994,6 +1057,65 @@ export const prisma = {
       const messageId = id();
       await qrun("INSERT INTO Message (id, conversationId, senderId, content, createdAt) VALUES (?,?,?,?,?)", messageId, data.conversationId, data.senderId, data.content, now());
       return { id: messageId, ...data, createdAt: new Date() };
+    },
+    async countFrom({ conversationId, senderId }: { conversationId: string; senderId: string }) {
+      const row = (await qget(
+        "SELECT COUNT(*) as c FROM Message WHERE conversationId = ? AND senderId = ?",
+        conversationId,
+        senderId,
+      )) as Dict;
+      return Number(row?.c ?? 0);
+    },
+    async unreadCount(userId: string) {
+      try {
+        const row = (await qget(
+          `SELECT COUNT(*) as c
+           FROM Message m
+           JOIN Conversation c ON c.id = m.conversationId
+           WHERE (c.userAId = ? OR c.userBId = ?)
+             AND m.senderId != ?
+             AND (
+               (c.userAId = ? AND (c.lastReadA IS NULL OR m.createdAt > c.lastReadA))
+               OR
+               (c.userBId = ? AND (c.lastReadB IS NULL OR m.createdAt > c.lastReadB))
+             )`,
+          userId,
+          userId,
+          userId,
+          userId,
+          userId,
+        )) as Dict;
+        return Number(row?.c ?? 0);
+      } catch {
+        return 0;
+      }
+    },
+    async unreadByConversation(userId: string) {
+      try {
+        const rows = (await qall(
+          `SELECT m.conversationId as conversationId, COUNT(*) as c
+           FROM Message m
+           JOIN Conversation c ON c.id = m.conversationId
+           WHERE (c.userAId = ? OR c.userBId = ?)
+             AND m.senderId != ?
+             AND (
+               (c.userAId = ? AND (c.lastReadA IS NULL OR m.createdAt > c.lastReadA))
+               OR
+               (c.userBId = ? AND (c.lastReadB IS NULL OR m.createdAt > c.lastReadB))
+             )
+           GROUP BY m.conversationId`,
+          userId,
+          userId,
+          userId,
+          userId,
+          userId,
+        )) as Dict[];
+        const counts: Record<string, number> = {};
+        for (const row of rows) counts[String(row.conversationId)] = Number(row.c);
+        return counts;
+      } catch {
+        return {};
+      }
     },
     async deleteMany() {
       await qexec("DELETE FROM Message");
